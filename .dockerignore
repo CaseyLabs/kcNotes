@@ -1,0 +1,46 @@
+.git
+.gitignore
+.dockerignore
+.agents
+docs
+LICENSE.md
+README.md
+AGENTS.md
+CLAUDE.md
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Runtime output and caches
+.cache
+.tmp
+tmp
+**/crash.log
+*.log
+logs
+dist
+coverage
+
+# App generated/runtime state
+src/data
+src/dist
+src/web/static/css/app.css
+
+# Node/Tailwind artifacts
+src/node_modules
+src/.cache
+src/.config
+
+# Editor and OS noise
+.DS_Store
+.idea
+.vscode
+*.swp
+*.swo
