@@ -1,0 +1,51 @@
+{{/*
+TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
+- This file is a Go `html/template` template fragment.
+- `{{ ... }}` executes template actions (print values, run conditionals, loops, and include named templates).
+- `.` is the current data context (similar to "this" in other languages).
+- `{{ if ... }}` conditionally renders markup; `{{ range ... }}` loops over slices/maps.
+- `{{ template "name" . }}` composes pages from reusable fragments.
+- `html/template` auto-escapes string output, which helps prevent XSS by default.
+- In this project, HTMX swaps these rendered fragments into specific targets for fast admin UX.
+*/}}
+
+{{ define "shell-start" }}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ .Title }}</title>
+    {{ if .CanonicalURL }}<link rel="canonical" href="{{ .CanonicalURL }}" />{{ end }}
+    {{ if .CSRFToken }}<meta name="csrf-token" content="{{ .CSRFToken }}" />{{ end }}
+    <link rel="stylesheet" href="{{ if .AssetBase }}{{ .AssetBase }}{{ else }}/static{{ end }}/css/app.css" />
+    <script src="{{ if .AssetBase }}{{ .AssetBase }}{{ else }}/static{{ end }}/js/vendor/htmx-2.0.4.min.js"></script>
+    <script src="{{ if .AssetBase }}{{ .AssetBase }}{{ else }}/static{{ end }}/js/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="space-y-1">
+          <h1 class="app-title">Go + HTMX CMS</h1>
+          <p class="app-subtitle">Server-rendered admin with HTMX partial updates.</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/" class="admin-link focus-ring">Home</a>
+          <a href="/admin" class="admin-link focus-ring">Admin</a>
+          <button type="button" class="theme-toggle focus-ring" data-theme-toggle aria-label="Cycle theme mode">
+            Theme
+            <span class="theme-toggle-state" data-theme-label>System</span>
+          </button>
+        </div>
+      </header>
+
+      <div id="flash" class="mb-4"></div>
+      <div id="modal"></div>
+{{ end }}
+
+{{ define "shell-end" }}
+    </div>
+  </body>
+</html>
+{{ end }}

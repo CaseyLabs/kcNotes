@@ -1,0 +1,41 @@
+{{/*
+TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
+- This file is a Go `html/template` template fragment.
+- `{{ ... }}` executes template actions (print values, run conditionals, loops, and include named templates).
+- `.` is the current data context (similar to "this" in other languages).
+- `{{ if ... }}` conditionally renders markup; `{{ range ... }}` loops over slices/maps.
+- `{{ template "name" . }}` composes pages from reusable fragments.
+- `html/template` auto-escapes string output, which helps prevent XSS by default.
+- In this project, HTMX swaps these rendered fragments into specific targets for fast admin UX.
+*/}}
+
+{{ define "home" }}
+  {{ template "shell-start" . }}
+  <main class="page-main">
+    <section class="space-y-2">
+      <h2 class="page-title">Published Posts</h2>
+      <p class="page-lede">Public content is rendered from Markdown with strict sanitization.</p>
+    </section>
+    <section class="panel">
+      {{ if .Posts }}
+        <ul class="space-y-3">
+          {{ range .Posts }}
+            <li class="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
+              <div>
+                <a class="font-medium text-slate-900 hover:underline" href="/p/{{ .Slug }}/">{{ .Title }}</a>
+                <p class="text-sm text-slate-500">{{ .UpdatedAt.Format "2006-01-02" }}</p>
+              </div>
+              <span class="rounded bg-slate-100 px-2 py-1 text-xs table-cell-muted">{{ .Type }}</span>
+            </li>
+          {{ end }}
+        </ul>
+      {{ else }}
+        <p class="muted">No published posts yet.</p>
+      {{ end }}
+    </section>
+    {{ if .ShowAdminLink }}
+      <a href="/admin" class="btn btn-primary focus-ring">Open Admin</a>
+    {{ end }}
+  </main>
+  {{ template "shell-end" . }}
+{{ end }}
