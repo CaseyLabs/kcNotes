@@ -1,0 +1,38 @@
+{{/*
+TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
+- This file is a Go `html/template` template fragment.
+- `{{ ... }}` executes template actions (print values, run conditionals, loops, and include named templates).
+- `.` is the current data context (similar to "this" in other languages).
+- `{{ if ... }}` conditionally renders markup; `{{ range ... }}` loops over slices/maps.
+- `{{ template "name" . }}` composes pages from reusable fragments.
+- `html/template` auto-escapes string output, which helps prevent XSS by default.
+- In this project, HTMX swaps these rendered fragments into specific targets for fast admin UX.
+*/}}
+
+{{ define "admin-login" }}
+  {{ template "shell-start" . }}
+  <main class="panel mx-auto max-w-md">
+    <h2 class="page-title">Admin Login</h2>
+    <p class="mt-1 text-sm muted">Sign in to continue.</p>
+    {{ if .Error }}
+      <div class="flash-error mt-4">{{ .Error }}</div>
+    {{ end }}
+    <form class="mt-5 space-y-4" method="post" action="/admin/login">
+      <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+      <label class="block text-sm muted">
+        Email
+        <input class="input focus-ring" type="email" name="email" required autocomplete="email" />
+      </label>
+      <label class="block text-sm muted">
+        Password
+        <input class="input focus-ring" type="password" name="password" required autocomplete="current-password" />
+      </label>
+      <label class="block text-sm muted">
+        Authenticator or Recovery Code
+        <input class="input focus-ring" type="text" name="otp" autocomplete="one-time-code" />
+      </label>
+      <button class="btn btn-primary focus-ring w-full" type="submit">Sign In</button>
+    </form>
+  </main>
+  {{ template "shell-end" . }}
+{{ end }}

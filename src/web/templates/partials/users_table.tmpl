@@ -1,0 +1,93 @@
+{{/*
+TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
+- This file is a Go `html/template` template fragment.
+- `{{ ... }}` executes template actions (print values, run conditionals, loops, and include named templates).
+- `.` is the current data context (similar to "this" in other languages).
+- `{{ if ... }}` conditionally renders markup; `{{ range ... }}` loops over slices/maps.
+- `{{ template "name" . }}` composes pages from reusable fragments.
+- `html/template` auto-escapes string output, which helps prevent XSS by default.
+- In this project, HTMX swaps these rendered fragments into specific targets for fast admin UX.
+*/}}
+
+{{ define "partial-users-table" }}
+{{ if .FlashMessage }}
+<div id="flash" hx-swap-oob="true" class="flash-success mb-4">{{ .FlashMessage }}</div>
+{{ end }}
+<section id="users-table" class="space-y-4">
+  <form class="panel" hx-post="/admin/users" hx-target="#users-table" hx-swap="outerHTML">
+    <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+    <h3 class="text-sm font-semibold text-slate-800">Create User</h3>
+    {{ if .CreateFormErrors }}
+      <div class="flash-error mt-3">
+        {{ range .CreateFormErrors }}<p>{{ . }}</p>{{ end }}
+      </div>
+    {{ end }}
+    <div class="mt-3 grid gap-3 md:grid-cols-4">
+      <label class="text-sm muted md:col-span-2">
+        Email
+        <input class="input focus-ring" type="email" name="email" value="{{ .CreateForm.Email }}" required />
+      </label>
+      <label class="text-sm muted">
+        Password
+        <input class="input focus-ring" type="password" name="password" required />
+      </label>
+      <label class="text-sm muted">
+        Role
+        <select class="select focus-ring" name="role">
+          <option value="admin" {{ if eq .CreateForm.Role "admin" }}selected{{ end }}>admin</option>
+          <option value="editor" {{ if eq .CreateForm.Role "editor" }}selected{{ end }}>editor</option>
+          <option value="author" {{ if eq .CreateForm.Role "author" }}selected{{ end }}>author</option>
+        </select>
+      </label>
+    </div>
+    <div class="mt-3">
+      <button type="submit" class="btn btn-primary focus-ring">Create User</button>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table class="data-table min-w-[760px] divide-y divide-slate-200">
+      <thead class="table-header">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium">Email</th>
+          <th class="px-4 py-3 text-left font-medium">Role</th>
+          <th class="px-4 py-3 text-left font-medium">Disabled</th>
+          <th class="px-4 py-3 text-left font-medium">MFA</th>
+          <th class="px-4 py-3 text-left font-medium">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {{ if .Users }}
+          {{ range .Users }}
+          <tr>
+            <td class="px-4 py-3 text-slate-900">{{ .Email }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ .Role }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ if .Disabled }}yes{{ else }}no{{ end }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ if .MFAEnabled }}enabled{{ else }}off{{ end }}</td>
+            <td class="px-4 py-3">
+              <form class="flex flex-wrap items-center gap-2" hx-post="/admin/users/{{ .ID }}/update" hx-target="#users-table" hx-swap="outerHTML">
+                <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}" />
+                <select class="select select-inline focus-ring" name="role">
+                  <option value="admin" {{ if eq .Role "admin" }}selected{{ end }}>admin</option>
+                  <option value="editor" {{ if eq .Role "editor" }}selected{{ end }}>editor</option>
+                  <option value="author" {{ if eq .Role "author" }}selected{{ end }}>author</option>
+                </select>
+                <label class="flex items-center gap-1 text-xs muted">
+                  <input type="checkbox" name="disabled" {{ if .Disabled }}checked{{ end }} {{ if eq .ID $.CurrentUserID }}disabled{{ end }} />
+                  disabled
+                </label>
+                <button type="submit" class="btn btn-secondary btn-xs focus-ring">Save</button>
+              </form>
+            </td>
+          </tr>
+          {{ end }}
+        {{ else }}
+          <tr>
+            <td colspan="5" class="px-4 py-8 text-center text-slate-500">No users found.</td>
+          </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+</section>
+{{ end }}

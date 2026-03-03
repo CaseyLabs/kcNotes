@@ -1,0 +1,102 @@
+{{/*
+TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
+- This file is a Go `html/template` template fragment.
+- `{{ ... }}` executes template actions (print values, run conditionals, loops, and include named templates).
+- `.` is the current data context (similar to "this" in other languages).
+- `{{ if ... }}` conditionally renders markup; `{{ range ... }}` loops over slices/maps.
+- `{{ template "name" . }}` composes pages from reusable fragments.
+- `html/template` auto-escapes string output, which helps prevent XSS by default.
+- In this project, HTMX swaps these rendered fragments into specific targets for fast admin UX.
+*/}}
+
+{{ define "admin-mfa" }}
+  {{ template "shell-start" . }}
+  <main class="page-main">
+    <section class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="page-title">MFA Security</h2>
+        <p class="page-lede">Configure TOTP and recovery codes for {{ .UserEmail }}.</p>
+      </div>
+      {{ template "partial-admin-nav" . }}
+    </section>
+
+    {{ if .FlashMessage }}
+      <div class="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ .FlashMessage }}</div>
+    {{ end }}
+
+    <section class="rounded border border-slate-200 bg-white p-4 space-y-4">
+      <h3 class="text-sm font-semibold text-slate-800">Authenticator App</h3>
+      {{ if .MFAEnabled }}
+        <p class="text-sm text-slate-600">MFA is currently enabled.</p>
+      {{ else if .MFASecret }}
+        <p class="text-sm text-slate-600">MFA secret is generated but not enabled yet. Enter a current authenticator code to finish.</p>
+      {{ else }}
+        <p class="text-sm text-slate-600">MFA is not configured.</p>
+      {{ end }}
+
+      {{ if .MFASecret }}
+        <div class="rounded border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-2">
+          <p><span class="font-semibold">Secret:</span> <code>{{ .MFASecret }}</code></p>
+          <p><span class="font-semibold">OTPAuth URI:</span> <code class="break-all">{{ .MFASetupURI }}</code></p>
+        </div>
+      {{ end }}
+
+      <div class="flex flex-wrap gap-3">
+        <form method="post" action="/admin/mfa/setup">
+          <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+          <button type="submit" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">Generate New Secret</button>
+        </form>
+        <form method="post" action="/admin/mfa/enable" class="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+          <label class="text-sm text-slate-700">
+            Code
+            <input class="mt-1 rounded border border-slate-300 px-3 py-2" type="text" name="otp" autocomplete="one-time-code" required />
+          </label>
+          <button type="submit" class="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700">Enable MFA</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="rounded border border-slate-200 bg-white p-4 space-y-4">
+      <h3 class="text-sm font-semibold text-slate-800">Recovery Codes</h3>
+      <p class="text-sm text-slate-600">Unused recovery codes: {{ .RecoveryCodeCount }}</p>
+      {{ if .NewRecoveryCodes }}
+        <div class="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p class="font-medium">Save these codes now. They will not be shown again.</p>
+          <ul class="mt-2 grid gap-1 sm:grid-cols-2">
+            {{ range .NewRecoveryCodes }}
+              <li><code>{{ . }}</code></li>
+            {{ end }}
+          </ul>
+        </div>
+      {{ end }}
+      <form method="post" action="/admin/mfa/recovery/regenerate" class="flex flex-wrap items-end gap-2">
+        <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+        <label class="text-sm text-slate-700">
+          Authenticator Code
+          <input class="mt-1 rounded border border-slate-300 px-3 py-2" type="text" name="otp" autocomplete="one-time-code" required />
+        </label>
+        <button type="submit" class="rounded border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100">Regenerate Codes</button>
+      </form>
+    </section>
+
+    <section class="rounded border border-rose-200 bg-white p-4 space-y-4">
+      <h3 class="text-sm font-semibold text-rose-800">Disable MFA</h3>
+      <form method="post" action="/admin/mfa/disable" class="grid gap-3 sm:grid-cols-3">
+        <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+        <label class="text-sm text-slate-700">
+          Password
+          <input class="mt-1 w-full rounded border border-slate-300 px-3 py-2" type="password" name="password" autocomplete="current-password" required />
+        </label>
+        <label class="text-sm text-slate-700">
+          Authenticator or Recovery Code
+          <input class="mt-1 w-full rounded border border-slate-300 px-3 py-2" type="text" name="otp" autocomplete="one-time-code" required />
+        </label>
+        <div class="flex items-end">
+          <button type="submit" class="rounded border border-rose-300 px-3 py-2 text-sm text-rose-700 hover:bg-rose-50">Disable MFA</button>
+        </div>
+      </form>
+    </section>
+  </main>
+  {{ template "shell-end" . }}
+{{ end }}
