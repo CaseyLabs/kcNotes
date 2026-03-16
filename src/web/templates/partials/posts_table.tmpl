@@ -1,0 +1,155 @@
+{{/*
+TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
+- This file is a Go `html/template` template fragment.
+- `{{ ... }}` executes template actions (print values, run conditionals, loops, and include named templates).
+- `.` is the current data context (similar to "this" in other languages).
+- `{{ if ... }}` conditionally renders markup; `{{ range ... }}` loops over slices/maps.
+- `{{ template "name" . }}` composes pages from reusable fragments.
+- `html/template` auto-escapes string output, which helps prevent XSS by default.
+- In this project, HTMX swaps these rendered fragments into specific targets for fast admin UX.
+*/}}
+
+{{ define "partial-posts-table" }}
+{{ if .FlashMessage }}
+<div id="flash" hx-swap-oob="true" class="flash-success mb-4">{{ .FlashMessage }}</div>
+{{ end }}
+<section id="posts-table" class="space-y-4">
+  <form class="panel grid gap-3 md:grid-cols-6" hx-get="/admin/posts/table" hx-target="#posts-table" hx-swap="outerHTML">
+    <input type="hidden" name="page" value="1" />
+    <label class="md:col-span-2 text-sm muted">
+      Search
+      <input class="input focus-ring" type="search" name="q" value="{{ .Query }}" placeholder="title, slug, body" />
+    </label>
+    <label class="text-sm muted">
+      Type
+      <select class="select focus-ring" name="type">
+        <option value="" {{ if eq .FilterType "" }}selected{{ end }}>all</option>
+        <option value="post" {{ if eq .FilterType "post" }}selected{{ end }}>post</option>
+        <option value="page" {{ if eq .FilterType "page" }}selected{{ end }}>page</option>
+      </select>
+    </label>
+    <label class="text-sm muted">
+      Status
+      <select class="select focus-ring" name="status">
+        <option value="" {{ if eq .FilterStatus "" }}selected{{ end }}>all active</option>
+        <option value="draft" {{ if eq .FilterStatus "draft" }}selected{{ end }}>draft</option>
+        <option value="published" {{ if eq .FilterStatus "published" }}selected{{ end }}>published</option>
+        <option value="archived" {{ if eq .FilterStatus "archived" }}selected{{ end }}>archived</option>
+        <option value="deleted" {{ if eq .FilterStatus "deleted" }}selected{{ end }}>deleted</option>
+      </select>
+    </label>
+    <label class="text-sm muted">
+      Sort
+      <select class="select focus-ring" name="sort">
+        <option value="" {{ if eq .FilterSort "" }}selected{{ end }}>updated desc</option>
+        <option value="updated_asc" {{ if eq .FilterSort "updated_asc" }}selected{{ end }}>updated asc</option>
+        <option value="created_desc" {{ if eq .FilterSort "created_desc" }}selected{{ end }}>created desc</option>
+        <option value="created_asc" {{ if eq .FilterSort "created_asc" }}selected{{ end }}>created asc</option>
+        <option value="title_asc" {{ if eq .FilterSort "title_asc" }}selected{{ end }}>title a-z</option>
+        <option value="title_desc" {{ if eq .FilterSort "title_desc" }}selected{{ end }}>title z-a</option>
+      </select>
+    </label>
+    <label class="text-sm muted">
+      Per page
+      <select class="select focus-ring" name="page_size">
+        <option value="10" {{ if eq .PageSize 10 }}selected{{ end }}>10</option>
+        <option value="25" {{ if eq .PageSize 25 }}selected{{ end }}>25</option>
+        <option value="50" {{ if eq .PageSize 50 }}selected{{ end }}>50</option>
+      </select>
+    </label>
+    <div class="md:col-span-6">
+      <button type="submit" class="btn btn-primary focus-ring">Apply</button>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table class="data-table min-w-[860px] divide-y divide-slate-200">
+      <thead class="table-header">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium">Title</th>
+          <th class="px-4 py-3 text-left font-medium">Slug</th>
+          <th class="px-4 py-3 text-left font-medium">Type</th>
+          <th class="px-4 py-3 text-left font-medium">Status</th>
+          <th class="px-4 py-3 text-left font-medium">Updated</th>
+          <th class="px-4 py-3 text-left font-medium">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {{ if .Posts }}
+          {{ range .Posts }}
+            {{ template "partial-post-row" . }}
+          {{ end }}
+        {{ else }}
+          <tr>
+            <td colspan="6" class="px-4 py-8 text-center text-slate-500">No posts matched this filter.</td>
+          </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flex items-center justify-between text-sm text-slate-600">
+    <p>Total: {{ .Total }} records</p>
+    <div class="flex items-center gap-2">
+      {{ if .HasPrevPage }}
+        <a class="btn btn-secondary btn-sm focus-ring" href="/admin/posts?{{ .QueryBase }}&page={{ .PrevPage }}" hx-get="/admin/posts/table?{{ .QueryBase }}&page={{ .PrevPage }}" hx-target="#posts-table" hx-swap="outerHTML">Prev</a>
+      {{ end }}
+      <span>Page {{ .Page }} / {{ .TotalPages }}</span>
+      {{ if .HasNextPage }}
+        <a class="btn btn-secondary btn-sm focus-ring" href="/admin/posts?{{ .QueryBase }}&page={{ .NextPage }}" hx-get="/admin/posts/table?{{ .QueryBase }}&page={{ .NextPage }}" hx-target="#posts-table" hx-swap="outerHTML">Next</a>
+      {{ end }}
+    </div>
+  </div>
+</section>
+{{ end }}
+
+{{ define "partial-post-row" }}
+{{ $post := . }}
+<tr id="row-{{ $post.ID }}" class="align-top">
+  <td class="px-4 py-3 font-medium text-slate-900">{{ $post.Title }}</td>
+  <td class="px-4 py-3 text-slate-700">{{ $post.Slug }}</td>
+  <td class="px-4 py-3 text-slate-700">{{ $post.Type }}</td>
+  <td class="px-4 py-3 text-slate-700">{{ $post.Status }}</td>
+  <td class="px-4 py-3 text-slate-500">{{ $post.UpdatedAt.Format "2006-01-02 15:04" }}</td>
+  <td class="px-4 py-3">
+    <div class="flex flex-wrap gap-2">
+      <a class="btn btn-secondary btn-xs focus-ring" href="/admin/posts/{{ $post.ID }}/edit">Edit</a>
+      <button class="btn btn-secondary btn-xs focus-ring" hx-get="/admin/posts/{{ $post.ID }}/quick-edit" hx-target="#row-{{ $post.ID }}" hx-swap="outerHTML" type="button">Quick Edit</button>
+      {{ if eq $post.Status "published" }}
+        <button class="btn btn-secondary btn-xs focus-ring" hx-post="/admin/posts/{{ $post.ID }}/unpublish" hx-target="#posts-table" hx-swap="outerHTML" type="button">Unpublish</button>
+      {{ else }}
+        <button class="btn btn-secondary btn-xs focus-ring" hx-post="/admin/posts/{{ $post.ID }}/publish" hx-target="#posts-table" hx-swap="outerHTML" type="button">Publish</button>
+      {{ end }}
+      <button class="btn btn-secondary btn-xs focus-ring" hx-post="/admin/posts/{{ $post.ID }}/delete" hx-confirm="Delete this post?" hx-target="#posts-table" hx-swap="outerHTML" type="button">Delete</button>
+    </div>
+  </td>
+</tr>
+{{ end }}
+
+{{ define "partial-post-row-edit" }}
+{{ $post := .Post }}
+<tr id="row-{{ $post.ID }}" class="bg-slate-50">
+  <td colspan="6" class="px-4 py-3">
+    {{ if .Errors }}
+      <div class="flash-error mb-3">
+        {{ range .Errors }}<p>{{ . }}</p>{{ end }}
+      </div>
+    {{ end }}
+    <form class="grid gap-3 md:grid-cols-4" hx-post="/admin/posts/{{ $post.ID }}/quick-edit" hx-target="#row-{{ $post.ID }}" hx-swap="outerHTML">
+      <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+      <label class="text-sm muted md:col-span-2">
+        Title
+        <input class="input focus-ring" type="text" name="title" value="{{ $post.Title }}" required />
+      </label>
+      <label class="text-sm muted">
+        Slug
+        <input class="input focus-ring" type="text" name="slug" value="{{ $post.Slug }}" required />
+      </label>
+      <div class="flex items-end gap-2">
+        <button class="btn btn-primary focus-ring" type="submit">Save</button>
+        <button class="btn btn-secondary focus-ring" hx-get="/admin/posts/table" hx-target="#posts-table" hx-swap="outerHTML" type="button">Cancel</button>
+      </div>
+    </form>
+  </td>
+</tr>
+{{ end }}

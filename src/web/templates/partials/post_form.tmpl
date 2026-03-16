@@ -1,0 +1,60 @@
+{{/*
+TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
+- This file is a Go `html/template` template fragment.
+- `{{ ... }}` executes template actions (print values, run conditionals, loops, and include named templates).
+- `.` is the current data context (similar to "this" in other languages).
+- `{{ if ... }}` conditionally renders markup; `{{ range ... }}` loops over slices/maps.
+- `{{ template "name" . }}` composes pages from reusable fragments.
+- `html/template` auto-escapes string output, which helps prevent XSS by default.
+- In this project, HTMX swaps these rendered fragments into specific targets for fast admin UX.
+*/}}
+
+{{ define "partial-post-form" }}
+<div class="panel">
+  {{ if .FormErrors }}
+    <div class="flash-error mb-4">
+      {{ range .FormErrors }}<p>{{ . }}</p>{{ end }}
+    </div>
+  {{ end }}
+  <form class="space-y-4" method="post" action="{{ .FormAction }}">
+    <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+
+    <div class="grid gap-4 md:grid-cols-3">
+      <label class="text-sm muted">
+        Type
+        <select class="select focus-ring" name="type" required>
+          <option value="post" {{ if eq .Form.Type "post" }}selected{{ end }}>post</option>
+          <option value="page" {{ if eq .Form.Type "page" }}selected{{ end }}>page</option>
+        </select>
+      </label>
+      <label class="text-sm muted">
+        Slug
+        <input class="input focus-ring" type="text" name="slug" value="{{ .Form.Slug }}" placeholder="my-post-slug" />
+      </label>
+      <label class="text-sm muted">
+        Status
+        <select class="select focus-ring" name="status" required>
+          <option value="draft" {{ if eq .Form.Status "draft" }}selected{{ end }}>draft</option>
+          <option value="published" {{ if eq .Form.Status "published" }}selected{{ end }}>published</option>
+          <option value="archived" {{ if eq .Form.Status "archived" }}selected{{ end }}>archived</option>
+        </select>
+      </label>
+    </div>
+
+    <label class="block text-sm muted">
+      Title
+      <input class="input focus-ring" type="text" name="title" value="{{ .Form.Title }}" maxlength="160" required />
+    </label>
+
+    <label class="block text-sm muted">
+      Body (Markdown)
+      <textarea class="textarea focus-ring" name="body_md">{{ .Form.BodyMD }}</textarea>
+    </label>
+
+    <div class="flex flex-wrap gap-2">
+      <button class="btn btn-primary focus-ring" type="submit">{{ .SubmitLabel }}</button>
+      <a href="/admin/posts" class="btn btn-secondary focus-ring">Cancel</a>
+    </div>
+  </form>
+</div>
+{{ end }}

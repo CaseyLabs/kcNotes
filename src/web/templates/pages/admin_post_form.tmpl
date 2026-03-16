@@ -1,0 +1,29 @@
+{{/*
+TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
+- This file is a Go `html/template` template fragment.
+- `{{ ... }}` executes template actions (print values, run conditionals, loops, and include named templates).
+- `.` is the current data context (similar to "this" in other languages).
+- `{{ if ... }}` conditionally renders markup; `{{ range ... }}` loops over slices/maps.
+- `{{ template "name" . }}` composes pages from reusable fragments.
+- `html/template` auto-escapes string output, which helps prevent XSS by default.
+- In this project, HTMX swaps these rendered fragments into specific targets for fast admin UX.
+*/}}
+
+{{ define "admin-post-form" }}
+  {{ template "shell-start" . }}
+  <main class="page-main">
+    <section class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="page-title">{{ .Title }}</h2>
+        <p class="page-lede">Use Markdown for body content.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        {{ template "partial-admin-nav" . }}
+        <a href="/admin/posts" class="btn btn-secondary focus-ring">Back to Posts</a>
+      </div>
+    </section>
+
+    {{ template "partial-post-form" . }}
+  </main>
+  {{ template "shell-end" . }}
+{{ end }}
