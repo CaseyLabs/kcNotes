@@ -1,0 +1,83 @@
+{{/*
+TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
+- This file is a Go `html/template` template fragment.
+- `{{ ... }}` executes template actions (print values, run conditionals, loops, and include named templates).
+- `.` is the current data context (similar to "this" in other languages).
+- `{{ if ... }}` conditionally renders markup; `{{ range ... }}` loops over slices/maps.
+- `{{ template "name" . }}` composes pages from reusable fragments.
+- `html/template` auto-escapes string output, which helps prevent XSS by default.
+- In this project, HTMX swaps these rendered fragments into specific targets for fast admin UX.
+*/}}
+
+{{ define "partial-audit-table" }}
+<section id="audit-table" class="space-y-4">
+  <form class="panel grid gap-3 md:grid-cols-4" hx-get="/admin/audit/table" hx-target="#audit-table" hx-swap="outerHTML">
+    <input type="hidden" name="page" value="1" />
+    <label class="md:col-span-2 text-sm muted">
+      Search
+      <input class="input focus-ring" type="search" name="q" value="{{ .Query }}" placeholder="email, action, entity, id, ip" />
+    </label>
+    <label class="text-sm muted">
+      Action
+      <input class="input focus-ring" type="text" name="action" value="{{ .FilterAction }}" placeholder="all actions" />
+    </label>
+    <label class="text-sm muted">
+      Per page
+      <select class="select focus-ring" name="page_size">
+        <option value="25" {{ if eq .PageSize 25 }}selected{{ end }}>25</option>
+        <option value="50" {{ if eq .PageSize 50 }}selected{{ end }}>50</option>
+        <option value="100" {{ if eq .PageSize 100 }}selected{{ end }}>100</option>
+      </select>
+    </label>
+    <div class="md:col-span-4">
+      <button type="submit" class="btn btn-primary focus-ring">Apply</button>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table class="data-table min-w-[760px] divide-y divide-slate-200">
+      <thead class="table-header">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium">Time (UTC)</th>
+          <th class="px-4 py-3 text-left font-medium">Actor</th>
+          <th class="px-4 py-3 text-left font-medium">Action</th>
+          <th class="px-4 py-3 text-left font-medium">Entity</th>
+          <th class="px-4 py-3 text-left font-medium">IP</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {{ if .Events }}
+          {{ range .Events }}
+            <tr>
+              <td class="px-4 py-3 text-slate-600">{{ .CreatedAt.Format "2006-01-02 15:04:05" }}</td>
+              <td class="px-4 py-3 text-slate-700">
+                {{ if .ActorEmail }}{{ .ActorEmail }}{{ else }}system{{ end }}
+              </td>
+              <td class="px-4 py-3 font-mono text-xs text-slate-700">{{ .Action }}</td>
+              <td class="px-4 py-3 text-slate-700">{{ .EntityType }}{{ if .EntityID }}:{{ .EntityID }}{{ end }}</td>
+              <td class="px-4 py-3 text-slate-500">{{ if .IP }}{{ .IP }}{{ else }}-{{ end }}</td>
+            </tr>
+          {{ end }}
+        {{ else }}
+          <tr>
+            <td colspan="5" class="px-4 py-8 text-center text-slate-500">No audit events matched this filter.</td>
+          </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flex items-center justify-between text-sm text-slate-600">
+    <p>Total: {{ .Total }} records</p>
+    <div class="flex items-center gap-2">
+      {{ if .HasPrevPage }}
+        <a class="btn btn-secondary btn-sm focus-ring" href="/admin/audit?{{ .QueryBase }}&page={{ .PrevPage }}" hx-get="/admin/audit/table?{{ .QueryBase }}&page={{ .PrevPage }}" hx-target="#audit-table" hx-swap="outerHTML">Prev</a>
+      {{ end }}
+      <span>Page {{ .Page }} / {{ .TotalPages }}</span>
+      {{ if .HasNextPage }}
+        <a class="btn btn-secondary btn-sm focus-ring" href="/admin/audit?{{ .QueryBase }}&page={{ .NextPage }}" hx-get="/admin/audit/table?{{ .QueryBase }}&page={{ .NextPage }}" hx-target="#audit-table" hx-swap="outerHTML">Next</a>
+      {{ end }}
+    </div>
+  </div>
+</section>
+{{ end }}

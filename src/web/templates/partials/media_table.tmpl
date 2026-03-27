@@ -1,0 +1,66 @@
+{{/*
+TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
+- This file is a Go `html/template` template fragment.
+- `{{ ... }}` executes template actions (print values, run conditionals, loops, and include named templates).
+- `.` is the current data context (similar to "this" in other languages).
+- `{{ if ... }}` conditionally renders markup; `{{ range ... }}` loops over slices/maps.
+- `{{ template "name" . }}` composes pages from reusable fragments.
+- `html/template` auto-escapes string output, which helps prevent XSS by default.
+- In this project, HTMX swaps these rendered fragments into specific targets for fast admin UX.
+*/}}
+
+{{ define "partial-media-table" }}
+{{ if .FlashMessage }}
+<div id="flash" hx-swap-oob="true" class="flash-warning mb-4">{{ .FlashMessage }}</div>
+{{ end }}
+<section id="media-table" class="space-y-4">
+  <form class="panel" hx-post="/admin/media" hx-encoding="multipart/form-data" hx-target="#media-table" hx-swap="outerHTML">
+    <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+    <div class="grid gap-3 md:grid-cols-4">
+      <label class="text-sm muted md:col-span-3">
+        Image file (PNG/JPEG/GIF, max 10 MiB)
+        <input class="input focus-ring" type="file" name="file" accept="image/png,image/jpeg,image/gif" required />
+      </label>
+      <div class="flex items-end">
+        <button type="submit" class="btn btn-primary focus-ring">Upload</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table class="data-table min-w-[760px] divide-y divide-slate-200">
+      <thead class="table-header">
+        <tr>
+          <th class="px-4 py-3 text-left font-medium">Name</th>
+          <th class="px-4 py-3 text-left font-medium">Type</th>
+          <th class="px-4 py-3 text-left font-medium">Size</th>
+          <th class="px-4 py-3 text-left font-medium">Static Path</th>
+          <th class="px-4 py-3 text-left font-medium">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {{ if .Media }}
+          {{ range .Media }}
+          <tr class="align-top">
+            <td class="px-4 py-3">
+              <p class="font-medium text-slate-900">{{ .OriginalName }}</p>
+              <p class="text-xs text-slate-500">{{ .CreatedAt.Format "2006-01-02 15:04" }}</p>
+            </td>
+            <td class="px-4 py-3 text-slate-700">{{ .MIME }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ .Size }} bytes</td>
+            <td class="px-4 py-3 font-mono text-xs text-slate-700">/media/{{ .StoredName }}</td>
+            <td class="px-4 py-3">
+              <a class="btn btn-secondary btn-xs focus-ring" href="/admin/media/files/{{ .ID }}" target="_blank" rel="noreferrer">Preview</a>
+            </td>
+          </tr>
+          {{ end }}
+        {{ else }}
+          <tr>
+            <td colspan="5" class="px-4 py-8 text-center text-slate-500">No uploads yet.</td>
+          </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+</section>
+{{ end }}

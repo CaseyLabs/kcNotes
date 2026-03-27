@@ -1,0 +1,43 @@
+{{/*
+TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
+- This file is a Go `html/template` template fragment.
+- `{{ ... }}` executes template actions (print values, run conditionals, loops, and include named templates).
+- `.` is the current data context (similar to "this" in other languages).
+- `{{ if ... }}` conditionally renders markup; `{{ range ... }}` loops over slices/maps.
+- `{{ template "name" . }}` composes pages from reusable fragments.
+- `html/template` auto-escapes string output, which helps prevent XSS by default.
+- In this project, HTMX swaps these rendered fragments into specific targets for fast admin UX.
+*/}}
+
+{{ define "partial-settings-form" }}
+{{ if .FlashMessage }}
+<div id="flash" hx-swap-oob="true" class="flash-success mb-4">{{ .FlashMessage }}</div>
+{{ end }}
+<section id="settings-form" class="space-y-4">
+  <form class="panel" method="post" action="{{ .SettingsAction }}" hx-post="{{ .SettingsAction }}" hx-target="#settings-form" hx-swap="outerHTML">
+    <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+    {{ if .FormErrors }}
+      <div class="flash-error mb-3">
+        {{ range .FormErrors }}<p>{{ . }}</p>{{ end }}
+      </div>
+    {{ end }}
+    <div class="grid gap-3 md:grid-cols-2">
+      <label class="text-sm muted">
+        Site Name
+        <input class="input focus-ring" type="text" name="site_name" value="{{ .Form.SiteName }}" required />
+      </label>
+      <label class="text-sm muted">
+        Site Base URL
+        <input class="input focus-ring" type="text" name="site_base_url" value="{{ .Form.SiteBaseURL }}" placeholder="https://example.com" />
+      </label>
+      <label class="text-sm muted md:col-span-2">
+        Feature Flags (comma-separated)
+        <textarea class="textarea focus-ring" name="feature_flags">{{ .Form.FeatureFlags }}</textarea>
+      </label>
+    </div>
+    <div class="mt-3">
+      <button type="submit" class="btn btn-primary focus-ring">Save Settings</button>
+    </div>
+  </form>
+</section>
+{{ end }}
