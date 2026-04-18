@@ -1,0 +1,14 @@
+[extend]
+useDefault = true
+
+[allowlist]
+paths = [
+  '''(^|/)\.cache/''',
+  '''(^|/)\.tmp/''',
+  '''(^|/)dist/''',
+  '''(^|/)src/node_modules/''',
+  '''(^|/)src/data/''',
+  '''(^|/)src/dist/''',
+  '''(^|/)src/\.cache/''',
+  '''(^|/)src/\.config/''',
+]

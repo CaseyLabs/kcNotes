@@ -1,0 +1,50 @@
+---
+# Dependabot config
+# - Checks for outdated dependencies and opens pull requests to update them.
+
+version: 2
+updates:
+  # Check GitHub Actions used by this repo.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    # Wait before opening normal version-update PRs so newly released actions
+    # have time for malicious releases, yanks, or incident reports to surface.
+    cooldown:
+      default-days: 7
+    # Control the commit message and PR title format that Dependabot uses.
+    commit-message:
+      prefix: "[dependabot]"
+      # Include the dependency scope in the title/message when possible.
+      include: "scope"
+    # Group GitHub Actions updates into a single PR.
+    # - This reduces the number of Dependabot PRs you have to review.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+
+  # Check Dockerfiles used by this repository.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    # Wait before opening normal version-update PRs so newly released images
+    # have time for malicious releases, yanks, or incident reports to surface.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "[dependabot]"
+      include: "scope"
+    groups:
+      dockerfile:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

@@ -1,0 +1,131 @@
+# Build code and artifacts from src/
+name: build.yml
+
+# This workflow only runs for version tags. Normal pushes and pull requests use
+# test.yml and scan.yml for fast feedback.
+on:
+  push:
+    tags:
+      - "v*"
+
+# Permissions default to none except what each workflow asks for. Releases need
+# write access to create the GitHub release and upload assets, OIDC for
+# Sigstore provenance, and write access to upload GitHub artifact attestations.
+permissions:
+  attestations: write
+  contents: write
+  id-token: write
+
+# Never cancel an in-flight release for a tag. Release jobs create artifacts and
+# attestations, so a maintainer should explicitly cancel them if needed.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: build-artifacts
+    # GitHub-hosted Ubuntu runner used for Docker, Make, and artifact actions.
+    runs-on: ubuntu-24.04
+    steps:
+      # fetch-depth: 0 gives release tooling and scanners full Git history.
+      # persist-credentials: false removes the checkout token after checkout.
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Release tags should point at reviewed default-branch history. This keeps
+      # a direct tag push from publishing an unmerged commit as a trusted release.
+      - name: Verify release tag is on default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -eu
+
+          git fetch --no-tags origin "+refs/heads/${DEFAULT_BRANCH}:refs/remotes/origin/${DEFAULT_BRANCH}"
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" "origin/${DEFAULT_BRANCH}"; then
+            printf 'release tag %s (%s) is not reachable from origin/%s\n' \
+              "${GITHUB_REF_NAME}" "${GITHUB_SHA}" "${DEFAULT_BRANCH}" >&2
+            exit 1
+          fi
+      # Repository variables can override release integrity options without
+      # editing the checked-in config file.
+      - name: Load release settings
+        env:
+          VAR_ENABLE_SBOM: ${{ vars.ENABLE_SBOM }}
+          VAR_ENABLE_GRYPE: ${{ vars.ENABLE_GRYPE }}
+          VAR_GRYPE_FAIL_ON: ${{ vars.GRYPE_FAIL_ON }}
+        run: |
+          set -eu
+
+          read_config() {
+            key=$1
+            default=${2:-}
+            (
+              . ./config/project.cfg
+              eval "printf '%s' \"\${${key}:-${default}}\""
+            )
+          }
+
+          write_env() {
+            key=$1
+            value=$2
+            printf '%s=%s\n' "$key" "$value" >> "$GITHUB_ENV"
+          }
+
+          write_env ENABLE_SBOM "${VAR_ENABLE_SBOM:-$(read_config ENABLE_SBOM true)}"
+          write_env ENABLE_GRYPE "${VAR_ENABLE_GRYPE:-$(read_config ENABLE_GRYPE true)}"
+          write_env GRYPE_FAIL_ON "${VAR_GRYPE_FAIL_ON:-$(read_config GRYPE_FAIL_ON critical)}"
+      # Tags can be created after CI has run, so release repeats the important
+      # quality gates on the exact tagged commit.
+      - name: Verify tests on tagged commit
+        run: PROJECT_CFG_FILE=config/project.cfg make test
+      - name: Verify security scans on tagged commit
+        run: PROJECT_CFG_FILE=config/project.cfg make scan
+      # make dist creates the archive plus SBOM, vulnerability report,
+      # checksums, and the human-readable release integrity summary.
+      - name: Build release artifacts
+        env:
+          RELEASE_INTEGRITY_VERSION: ${{ github.ref_name }}
+        run: PROJECT_CFG_FILE=config/project.cfg make dist
+      # Upload dist/ so release outputs can be downloaded from the Actions run.
+      - name: Upload release artifact bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ github.ref_name }}
+          path: dist/
+      # Attach GitHub artifact provenance for every generated release file.
+      - name: Create release provenance attestation
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: "dist/**"
+      # Publish the human- and machine-readable integrity files to the GitHub
+      # Release page. The full generated dist/ bundle remains available as the
+      # Actions artifact for CI evidence. `gh release create` stages assets on a
+      # draft before publishing, which is compatible with immutable releases.
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+
+          release_assets=
+          for asset in dist/SECURITY-ANALYSIS.md dist/SHA256SUMS dist/kcnotes.spdx.json dist/kcnotes-linux-amd64; do
+            if [ -f "${asset}" ]; then
+              release_assets="${release_assets} ${asset}"
+            fi
+          done
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            printf 'release %s already exists; refusing to modify published assets\n' "${RELEASE_TAG}" >&2
+            exit 1
+          fi
+
+          # shellcheck disable=SC2086
+          gh release create "${RELEASE_TAG}" ${release_assets} \
+            --title "${RELEASE_TAG}" \
+            --generate-notes \
+            --latest \
+            --verify-tag
