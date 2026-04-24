@@ -47,7 +47,7 @@ Core app commands:
 - `make lint`: runs format and lint checks.
 - `make migrate`: applies database migrations.
 - `make create-user`: creates a user from `EMAIL`, `PASSWORD`, and `ROLE`.
-- `make run`: starts the CMS.
+- `make run`: applies pending migrations, then starts the CMS.
 - `make publish`: writes the static site to `dist/site` unless `PUBLISH_OUT_DIR` is set.
 - `make preview`: serves the published static site.
 - `make smoke`: runs HTTP smoke probes.

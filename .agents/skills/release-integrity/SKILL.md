@@ -36,7 +36,7 @@ repository.
 - Document any weakening of defaults explicitly.
 - Keep guidance clear about what release evidence this repository should produce
   and why.
-- Pair this skill with `template-validation` when release changes require `make dist`, workflow checks, or release packaging validation.
+- Pair this skill with `workflow-validation` when release changes require `make dist`, workflow checks, or release packaging validation.
 
 ## Review priorities
 - supply-chain risk

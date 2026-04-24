@@ -77,7 +77,7 @@ generated output, local databases, caches, or installed dependencies under `src/
 Use repo-local skills only when the skill exists and the request matches its
 description.
 
-- Use `template-validation` for root Makefile, Docker, scripts, CI, scan,
+- Use `workflow-validation` for root Makefile, Docker, scripts, CI, scan,
   release, packaging, or docs/implementation alignment checks.
 - Use `github-hardening` for GitHub-side hardening guidance, rulesets, scanning,
   review protections, or workflow permissions.

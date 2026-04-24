@@ -1,13 +1,11 @@
 ---
-name: template-validation
+name: workflow-validation
 description: Use when validating that kcNotes still works as intended after changes to Docker-first Makefile workflows, scripts, CI, release packaging, smoke tests, or documentation alignment. Do not use for app redesign, GitHub-policy-only changes, or instruction-only skill edits with no workflow impact.
 ---
 
 # Workflow validation
 
-Use this skill when validating root workflow changes in this repository. The
-skill name is retained for compatibility with existing agent routing, but the
-scope is the current kcNotes workflow.
+Use this skill when validating root workflow changes in this repository.
 
 ## Use this skill when
 - changing `Makefile`, `Dockerfile`, `scripts/`, tests, packaging manifests, or workflows
