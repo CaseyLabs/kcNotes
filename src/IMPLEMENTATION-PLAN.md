@@ -1,0 +1,457 @@
+# Implementation Plan
+
+Date: 2026-04-24
+
+## Purpose
+
+This document is intended to be the current project tracker:
+
+- What the CMS is trying to become.
+- What is already implemented in the current repository.
+- What still needs to be implemented before the required scope is complete.
+- Which items are optional backlog rather than required completion work.
+
+## Project Goals
+
+Build a secure, server-rendered Go CMS with a WordPress-admin-style experience:
+
+- Go backend using server-rendered HTML and a long-running HTTP process.
+- HTMX admin UI for partial updates without becoming a SPA.
+- Tailwind-based styling with a minimal, responsive admin interface.
+- SQLite-compatible data model:
+  - local SQLite/libSQL file for development and CI;
+  - remote Turso/libSQL for staging/production;
+  - optional embedded replica mode with explicit read-your-writes behavior.
+- Static publishing mode that generates a complete static site from CMS content.
+- Containerized development and CI workflows through Docker and Make.
+- Security-first defaults for auth, sessions, CSRF, content rendering, uploads,
+  deployment, and public admin exposure.
+- Teaching-oriented code comments in new or updated source files.
+
+## Implemented Already
+
+The current working tree substantially implements the original milestones and
+the UI refresh.
+
+### Application Structure
+
+- Go application entrypoint at `cmd/cms/main.go`.
+- Internal package layout for app wiring, HTTP handlers/middleware/routes/views,
+  domain types, SQLite store, content rendering, and static publishing.
+- Server-side Go templates under `web/templates`.
+- Self-hosted static assets under `web/static`.
+
+### Containerized Workflow
+
+- `Makefile` targets for common workflows:
+  - `make image`
+  - `make deps`
+  - `make css`
+  - `make build`
+  - `make test`
+  - `make lint`
+  - `make migrate`
+  - `make create-user`
+  - `make publish`
+  - `make preview`
+  - `make run`
+  - `make stop`
+  - `make smoke`
+  - `make clean`
+- Docker-based helper scripts under `scripts/`.
+- Containers run with host UID/GID and project-mounted workspace.
+- Run/preview scripts auto-select a nearby free host port when `HOST_PORT` is
+  not pinned.
+
+### Routing and HTMX Contract
+
+- Public routes:
+  - `GET /healthz`
+  - `GET /`
+  - `GET /p/{slug}/`
+  - `GET /page/{slug}/`
+- Admin routes:
+  - login/logout;
+  - dashboard;
+  - posts/pages list, create, edit, quick edit, publish, unpublish, delete;
+  - media upload/browse/file preview;
+  - users;
+  - settings;
+  - audit log;
+  - MFA setup/enable/disable/recovery-code regeneration.
+- HTMX-aware table/form partials.
+- Standard partial targets exist for `#flash`, `#modal`, `#posts-table`, and
+  row-level post swaps.
+- Successful HTMX writes that navigate use `HX-Redirect`.
+- Validation and middleware errors are rendered as fragments where applicable.
+
+### Authentication and Authorization
+
+- Session-based login/logout.
+- Secure cookie attributes including `HttpOnly`, `SameSite=Lax`, configurable
+  `Secure`, and configurable admin cookie path.
+- Argon2id password hashing.
+- RBAC roles:
+  - `admin`;
+  - `editor`;
+  - `author`.
+- Author ownership enforcement on post write paths.
+- Disabled users are rejected during session loading.
+- Admin-only user management.
+- Self-lockout guards for admin user updates.
+
+### MFA and Login Hardening
+
+- TOTP MFA support.
+- One-time recovery codes.
+- MFA enforcement during login for MFA-enabled users.
+- Per-IP and per-account login rate limiting.
+- Per-account lockout/backoff after repeated failed authentication attempts.
+- Sensitive endpoint rate limiting.
+- Login success/failure audit events.
+
+### CSRF and Security Headers
+
+- CSRF middleware for state-changing admin requests.
+- Hidden `_csrf` fields on forms.
+- HTMX global `X-CSRF-Token` injection from `web/static/js/app.js`.
+- Security headers:
+  - `Content-Security-Policy` with `script-src 'self'`;
+  - `X-Frame-Options: DENY`;
+  - `X-Content-Type-Options: nosniff`;
+  - `Referrer-Policy: strict-origin-when-cross-origin`;
+  - `Permissions-Policy`.
+- Self-hosted HTMX asset.
+
+### Posts and Pages
+
+- Post/page types.
+- Status workflow:
+  - `draft`;
+  - `published`;
+  - `archived`;
+  - soft-deleted via `deleted_at`.
+- Admin listing with search/filter/sort/pagination.
+- HTMX table refreshes.
+- Create/edit forms.
+- Quick-edit row swaps.
+- Publish/unpublish actions.
+- Soft delete.
+- Slug validation and uniqueness enforcement.
+- Validation error fragments.
+
+### Content Safety
+
+- Markdown stored in the database and rendered server-side.
+- GFM support through Goldmark.
+- Sanitized HTML output through Bluemonday.
+- Public post/page templates use sanitized `template.HTML`.
+- Untrusted template values remain escaped by Go `html/template`.
+
+### Media
+
+- Admin media upload and browse UI.
+- Upload size limit.
+- MIME allowlist for JPEG, PNG, and GIF.
+- Magic-byte/content detection.
+- Image decode verification.
+- Randomized stored filenames.
+- Original filename stored only as metadata.
+- Per-user and global media quota enforcement.
+- Auth-protected media preview endpoint.
+- Static publishing copies allowlisted media into `dist/media`.
+
+### Settings
+
+- Key/value settings table.
+- Admin settings UI for site-level values such as site name, base URL, and
+  feature flags.
+- Settings changes are audited.
+
+### Search and Audit
+
+- SQLite FTS5 `posts_fts` virtual table.
+- Trigger-based FTS synchronization for post insert/update/delete.
+- Admin post search uses FTS-backed queries.
+- Audit log table and admin audit UI.
+- Audit events for login/logout and post/media/settings mutations.
+
+### Database and Store Hardening
+
+- Local, remote, and replica DB modes.
+- Local SQLite/libSQL uses one open connection and WAL/foreign-key/busy-timeout
+  PRAGMAs.
+- Remote Turso/libSQL connectivity using `DATABASE_URL` and
+  `DATABASE_AUTH_TOKEN`.
+- Embedded replica support with `REPLICA_SYNC_INTERVAL` and
+  `REPLICA_READ_YOUR_WRITES`.
+- Store retry helpers:
+  - `ExecRetry`;
+  - `QueryRetry`;
+  - `TxRetry`.
+- Exponential backoff and jitter for transient failures.
+- Retry metrics counters for store-level retry activity.
+- Idempotent conflict-as-success handling for selected replayed operation IDs.
+- Transactional migration application.
+
+### Static Publishing and Preview
+
+- `cms publish` / `make publish` renders static output.
+- Output paths:
+  - `/` to `dist/index.html`;
+  - `/p/{slug}/` to `dist/p/{slug}/index.html`;
+  - `/page/{slug}/` to `dist/page/{slug}/index.html`;
+  - static assets to `dist/assets/*`;
+  - uploaded media to `dist/media/*`.
+- RSS generation.
+- `sitemap.xml` generation.
+- `.publish-manifest.json` generation.
+- Removed-file accounting from prior manifests.
+- Temp-dir render followed by best-effort atomic output swap.
+- `cms preview` / `make preview` serves generated static output locally.
+
+### Deployment and Smoke Checks
+
+- `GET /healthz` health probe.
+- `make smoke` / `scripts/smoke.sh` support deployed smoke checks.
+- Optional GitHub Pages publishing workflow exists.
+- Optional admin deployment workflow exists.
+- Deploy workflow uses pinned SSH known-hosts support.
+
+### UI Refresh
+
+- Semantic CSS tokens for background, surface, text, border, accent/focus, and
+  status colors.
+- Light/dark theme support with CSS custom properties.
+- Default `system` theme behavior using `prefers-color-scheme`.
+- Manual theme cycle:
+  - `system`;
+  - `light`;
+  - `dark`.
+- Theme preference stored in `localStorage` as `cms_theme_preference`.
+- `data-theme` override on `<html>` for manual light/dark modes.
+- Shared header theme toggle.
+- Shared admin navigation partial.
+- Responsive admin/public templates using shared component classes.
+- README documents theme behavior.
+
+## Required Remaining Work
+
+### R1: Autosave Drafts
+
+Autosave is the only required gap identified by `FINAL-PLAN.md`. It is not
+implemented yet in the current source tree.
+
+Current missing pieces:
+
+- No autosave database table or migration.
+- No autosave domain type.
+- No autosave store methods.
+- No autosave admin routes.
+- No autosave handlers.
+- No throttled HTMX trigger in the post/page editor.
+- No save-status UI.
+- No recovery/dismiss flow for newer autosave snapshots.
+- No autosave tests.
+- README and `AGENTS.md` still do not describe autosave as complete.
+
+#### R1.1 Data Model
+
+Add an autosave snapshot table. Recommended shape:
+
+- `id TEXT PRIMARY KEY`
+- `post_id TEXT`
+- `author_id TEXT NOT NULL`
+- `type TEXT NOT NULL`
+- `title TEXT NOT NULL`
+- `slug TEXT NOT NULL`
+- `body_md TEXT NOT NULL`
+- `status TEXT NOT NULL`
+- `base_updated_at TEXT`
+- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
+- `updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
+
+Constraints:
+
+- Keep only the latest autosave per `(post_id, author_id)` for existing posts.
+- For unsaved drafts, either create a real draft post first or support a stable
+  client draft key. Prefer creating a real draft post if it keeps the model
+  simpler and safer.
+- Preserve author ownership rules.
+- Do not allow autosave to publish content.
+
+#### R1.2 Store API
+
+Add store methods for:
+
+- create/update latest autosave snapshot;
+- get latest autosave snapshot for a post/user;
+- dismiss autosave snapshot;
+- optionally clean stale autosave snapshots on access.
+
+Behavior:
+
+- Use retry wrappers for transient failures.
+- Treat duplicate latest-snapshot writes as update/upsert behavior.
+- Compare `base_updated_at` or equivalent revision token to detect stale editor
+  state.
+
+#### R1.3 HTTP Contract
+
+Add autosave endpoints:
+
+- `POST /admin/posts/{id}/autosave` for existing posts/pages.
+- `POST /admin/posts/autosave` for a new unsaved editor flow only if the UI
+  keeps unsaved posts before creating a real draft.
+
+Response behavior:
+
+- Auth, CSRF, rate limiting, and ownership checks match other post write routes.
+- Successful HTMX autosave returns a fragment that updates save status or
+  `#flash`.
+- Invalid payloads return `422` with a validation fragment.
+- Unauthorized/forbidden behavior follows existing middleware conventions.
+
+#### R1.4 Editor UX
+
+Update `web/templates/partials/post_form.tmpl`:
+
+- Add HTMX autosave trigger for edit forms.
+- Use a throttle/idle interval of about 3-5 seconds.
+- Show save states:
+  - `Saving...`;
+  - `Saved`;
+  - `Failed`.
+- Ensure full save/publish/unpublish remains the source of truth for canonical
+  content state.
+- Avoid autosave overwriting canonical status unexpectedly.
+
+#### R1.5 Recovery Flow
+
+On editor load:
+
+- Check whether a newer autosave snapshot exists.
+- Show a clear restore/dismiss choice.
+- Restore should populate the editor with snapshot content.
+- Dismiss should delete or mark the snapshot ignored.
+
+#### R1.6 Tests
+
+Add focused tests:
+
+- Store create/update/get/dismiss behavior.
+- Ownership restrictions.
+- Stale revision conflict behavior.
+- Handler success fragment.
+- Handler validation failure with `422`.
+- Unauthorized/forbidden paths.
+- Existing create/edit/publish/unpublish/delete flows remain stable.
+
+#### R1.7 Docs
+
+After autosave is implemented:
+
+- Update `README.md` feature list and route list.
+- Update `AGENTS.md` milestone status to remove the out-of-scope autosave note.
+- Update this implementation plan with the completion outcome. Do not reference
+  `.agent/CONTINUITY.md` unless that file is restored.
+
+## Optional Backlog
+
+These items are useful, but they are not required for the current documented
+completion scope.
+
+### O1: Password Reset Flow
+
+- Password reset request endpoint.
+- Single-use, expiring reset tokens.
+- Secure password update.
+- Rate limiting.
+- Audit events for request and completion.
+
+### O2: Media Processing Pipeline
+
+- EXIF stripping for uploaded images.
+- Thumbnail generation.
+- Responsive image variants.
+- Optional background job runner for media processing.
+- Variant metadata in the media model.
+
+### O3: Jobs Table and Runner
+
+- `jobs` table with unique `job_key`.
+- Internal runner with retry/attempt tracking.
+- Use for stale autosave cleanup, media processing, publish workflows, or other
+  deferred work.
+
+### O4: Observability Expansion
+
+- Request duration metrics.
+- Login failure and lockout counters.
+- Rate-limit hit counters.
+- DB retry dashboards/log aggregation guidance.
+- Job queue depth metrics if the job runner is added.
+
+### O5: Media De-Duplication
+
+- Decide whether `media.sha256` should become unique.
+- If enabled, treat same-hash uploads as reuse or conflict based on UX needs.
+
+### O6: Admin Exposure Extras
+
+- Optional admin IP allowlist.
+- Explicit `/robots.txt` rules blocking admin paths if static/public serving is
+  expanded.
+
+## Verification Plan
+
+For documentation-only changes:
+
+- No runtime checks are required.
+
+For autosave or other code changes:
+
+1. `make css`
+2. `make lint`
+3. `make build`
+4. `make test`
+5. `make smoke`
+
+For UI-affecting changes, also manually check:
+
+- `/`
+- `/admin/login`
+- `/admin`
+- `/admin/posts`
+- `/admin/posts/new`
+- `/admin/media`
+- `/admin/users`
+- `/admin/settings`
+- `/admin/audit`
+- `/admin/mfa`
+
+For publishing changes, also check:
+
+- `make publish`
+- `make preview`
+- generated `dist/index.html`;
+- generated post/page routes;
+- generated `rss.xml`;
+- generated `sitemap.xml`;
+- generated `.publish-manifest.json`;
+- orphan cleanup after deleting or renaming content.
+
+## Completion Criteria
+
+Required scope is complete when:
+
+- Autosave drafts work for post/page editing.
+- Autosave respects RBAC, author ownership, CSRF, and validation rules.
+- Autosave does not publish content or overwrite canonical state unexpectedly.
+- Newer autosave snapshots can be restored or dismissed.
+- Autosave has store and handler regression tests.
+- Existing required checks pass.
+- README, `AGENTS.md`, and this implementation plan accurately reflect the
+  completed state.
+
+Optional scope is complete only when separately selected and implemented.
