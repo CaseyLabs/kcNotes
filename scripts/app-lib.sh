@@ -5,8 +5,8 @@ set -eu
 PROJECT_CFG_FILE=${PROJECT_CFG_FILE:-config/project.cfg}
 project_cfg_file=${PROJECT_CFG_FILE}
 case "${project_cfg_file}" in
-  /* | ./* | ../*) ;;
-  *) project_cfg_file="./${project_cfg_file}" ;;
+/* | ./* | ../*) ;;
+*) project_cfg_file="./${project_cfg_file}" ;;
 esac
 [ -f "${project_cfg_file}" ] || {
   printf 'missing %s; set PROJECT_CFG_FILE to an existing config file\n' "${project_cfg_file}" >&2
@@ -178,4 +178,25 @@ run_web_container() {
     "${app_image}" \
     sh -ceu "${command_string}"
   printf 'URL: http://localhost:%s\n' "${host_port}"
+}
+
+wait_for_http_ok() {
+  url=$1
+  timeout_seconds=${2:-60}
+  started_at=$(date +%s)
+  while :; do
+    if curl -fsS -o /dev/null "${url}" >/dev/null 2>&1; then
+      return 0
+    fi
+    now=$(date +%s)
+    if [ $((now - started_at)) -ge "${timeout_seconds}" ]; then
+      printf 'timed out waiting for %s\n' "${url}" >&2
+      return 1
+    fi
+    sleep 1
+  done
+}
+
+build_css_command() {
+  printf "%s" "cd src && mkdir -p /workspace/.cache && npm ci --no-fund --no-audit && BROWSERSLIST_IGNORE_OLD_DATA=1 npm run build:css"
 }

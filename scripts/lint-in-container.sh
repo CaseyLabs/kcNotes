@@ -9,21 +9,21 @@ case "${project_cfg_file}" in
 esac
 
 [ -f "${project_cfg_file}" ] || {
-	printf 'missing %s; set PROJECT_CFG_FILE to an existing config file\n' "${project_cfg_file}" >&2
-	exit 1
+  printf 'missing %s; set PROJECT_CFG_FILE to an existing config file\n' "${project_cfg_file}" >&2
+  exit 1
 }
 
 # shellcheck disable=SC1090
 . "${project_cfg_file}"
 
 fail_if_file_has_content() {
-	output_file=$1
-	help_message=$2
-	if [ -s "${output_file}" ]; then
-		cat "${output_file}"
-		echo "${help_message}"
-		exit 1
-	fi
+  output_file=$1
+  help_message=$2
+  if [ -s "${output_file}" ]; then
+    cat "${output_file}"
+    echo "${help_message}"
+    exit 1
+  fi
 }
 
 mkdir -p /workspace/.cache/bin
@@ -45,10 +45,11 @@ fail_if_file_has_content "${GOFMT_OUT}" 'Run: gofmt -w <files>'
 
 echo '[fmt-check] prettier'
 find . -type f \
-	\( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.yml' -o -name '*.yaml' \) \
-	-not -path './node_modules/*' \
-	-not -path './web/static/js/vendor/*' \
-	-print0 | xargs -0 -r npx --yes "prettier@${DEV_LINT_PRETTIER_VERSION}" --check
+  \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.yml' -o -name '*.yaml' \) \
+  -not -path './node_modules/*' \
+  -not -path './web/static/css/app.css' \
+  -not -path './web/static/js/vendor/*' \
+  -print0 | xargs -0 -r npx --yes "prettier@${DEV_LINT_PRETTIER_VERSION}" --check
 npx --yes "prettier@${DEV_LINT_PRETTIER_VERSION}" --check README.md 2>/dev/null || true
 
 echo '[lint] go vet'
@@ -64,9 +65,9 @@ find scripts -type f -name '*.sh' -print0 | xargs -0 -r shellcheck -x -e SC1091
 echo '[lint] jshint'
 cd /workspace/src
 find . -type f -name '*.js' \
-	-not -path './node_modules/*' \
-	-not -path './web/static/js/vendor/*' \
-	-print0 | xargs -0 -r npx --yes "jshint@${DEV_LINT_JSHINT_VERSION}"
+  -not -path './node_modules/*' \
+  -not -path './web/static/js/vendor/*' \
+  -print0 | xargs -0 -r npx --yes "jshint@${DEV_LINT_JSHINT_VERSION}"
 
 echo '[lint] markdownlint'
 cd /workspace
