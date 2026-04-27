@@ -94,7 +94,7 @@ For root workflow, CI, scan, or release changes, flag when a change:
 
 When relevant, check alignment across:
 
-- `src/AGENTS.md` and `docs/IMPLEMENTATION-PLAN.MD`
+- `src/AGENTS.md` and `docs/IMPLEMENTATION-PLAN.md`
 - app tests and source build inputs under `src/`
 - root `Makefile`, `scripts/`, `Dockerfile`, and `config/project.cfg`
 - `.github/workflows/`

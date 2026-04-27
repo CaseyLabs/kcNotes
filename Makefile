@@ -6,10 +6,13 @@ PROJECT_IMAGE ?= $(PROJECT_NAME):local
 # Dynamically generate Makefile commands
 PHONY_TARGETS := $(shell awk '/^[[:alnum:]_-]+:([^=]|$$).*##(@internal)? / { sub(/:.*/, "", $$1); print $$1 }' $(lastword $(MAKEFILE_LIST)))
 .PHONY: $(PHONY_TARGETS)
+.PHONY: all clean test
 
 help: ##@show available options
 	@printf '\nAvailable targets:\n\n'
 	@awk 'BEGIN { FS = ":.*## " } /^[[:alnum:]_-]+:([^=]|$$).*## / { printf "  %-24s %s\n", $$1, $$2 }' $(lastword $(MAKEFILE_LIST))
+
+all: build
 
 build: ## builds the kcNotes development image and app
 	sh scripts/build.sh "$(PROJECT_CFG_FILE)"

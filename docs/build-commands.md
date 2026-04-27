@@ -19,22 +19,30 @@ details so local use and GitHub Actions share the same behavior.
 - `make publish`: writes static site output to `dist/site` unless overridden.
 - `make preview`: serves published static site output.
 - `make smoke`: runs HTTP smoke probes.
-- `make clean`: removes generated artifacts, caches, local DB files, and the local image.
+- `make clean`: removes generated artifacts, caches, local DB files, and the
+  local image.
 - `make shell`: opens a shell in the project image.
 
 ## Maintenance Commands
 
-- `make scan`: runs secret scanning, workflow linting, and workflow policy checks.
-- `make update`: resolves reviewed image selectors into digest locks and syncs generated references.
+- `make scan`: runs secret scanning, workflow linting, and workflow policy
+  checks.
+- `make update`: resolves reviewed image selectors into digest locks and syncs
+  generated references.
 - `make renovate`: runs self-hosted Renovate when enabled.
 - `make dist`: builds kcNotes release artifacts and integrity outputs under `dist/`.
 
 ## Common Inputs
 
-- `PROJECT_CFG_FILE`: selects the project config file. Defaults to `config/project.cfg`.
-- `ENABLE_SBOM`, `ENABLE_GRYPE`, `GRYPE_FAIL_ON`: control release integrity outputs used by `make dist` and the release workflow.
-- `DOCKER_BUILD_EXTRA_ARGS`: lets CI provide Buildx cache options without changing local defaults.
-- `DOCKER_UID`, `DOCKER_GID`, `DOCKER_HOME`, `DOCKER_HOME_SOURCE`, and `DOCKER_TMPDIR`: control container user and cache paths for bind-mounted workflows.
+- `PROJECT_CFG_FILE`: selects the project config file. Defaults to
+  `config/project.cfg`.
+- `ENABLE_SBOM`, `ENABLE_GRYPE`, `GRYPE_FAIL_ON`: control release integrity
+  outputs used by `make dist` and the release workflow.
+- `DOCKER_BUILD_EXTRA_ARGS`: lets CI provide Buildx cache options without
+  changing local defaults.
+- `DOCKER_UID`, `DOCKER_GID`, `DOCKER_HOME`, `DOCKER_HOME_SOURCE`, and
+  `DOCKER_TMPDIR`: control container user and cache paths for bind-mounted
+  workflows.
 - `HOST_PORT`: pins the host port for `make run` and `make preview`.
 - `PUBLISH_OUT_DIR`: overrides static publish output.
 

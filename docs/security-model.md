@@ -53,7 +53,8 @@ Other protections depend on GitHub repository or organization settings:
 - environment protection rules
 - organization SSO, audit logging, and secret access policies
 
-Document GitHub-side controls so maintainers know which protections are actually active.
+Document GitHub-side controls so maintainers know which protections are
+actually active.
 
 ## Credentials
 
@@ -61,7 +62,8 @@ Keep credentials out of tracked files, examples, docs, and logs. Prefer narrow,
 short-lived credentials such as GitHub App tokens or OIDC-based credentials.
 Avoid broad personal access tokens for automation.
 
-Self-hosted Renovate is designed to use a GitHub App token with scoped permissions.
+Self-hosted Renovate is designed to use a GitHub App token with scoped
+permissions.
 
 ## Related Docs
 

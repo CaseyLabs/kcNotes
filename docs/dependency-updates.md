@@ -12,6 +12,8 @@ It updates:
 
 - GitHub Actions used by workflows
 - Dockerfile dependency references when present
+- Go module dependencies in `src/go.mod`
+- npm dependencies in `src/package-lock.json`
 
 Routine update PRs wait for the configured cooldown period. This timing defense
 helps avoid immediately adopting a newly published action or image before yanks,
@@ -22,8 +24,8 @@ malicious releases, or incident reports have time to surface.
 Self-hosted Renovate is configured in `.github/renovate.json` and runs through
 `make renovate`.
 
-It updates reviewed selectors in `config/project.cfg`, including tool images.
-After updating those selectors, Renovate is allowed to run:
+It updates reviewed image selectors in `config/project.cfg`, including tool
+images. After updating those selectors, Renovate is allowed to run:
 
 ```sh
 sh scripts/update.sh config/project.cfg

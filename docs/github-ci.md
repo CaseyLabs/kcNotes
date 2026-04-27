@@ -1,8 +1,9 @@
 # GitHub Configuration
 
-This project's `.github` folder contains the GitHub Actions CI configs and workflows:
+This project's `.github` folder contains the GitHub Actions CI configs and
+workflows:
 
-```
+```text
 .
 └── .github/
     ├── dependabot.yml
@@ -26,6 +27,8 @@ This project's `.github` folder contains the GitHub Actions CI configs and workf
 - `dependabot.yml`
   - GitHub Actions updates
   - Dockerfile dependency updates
+  - Go module dependency updates
+  - npm dependency updates
 - `renovate.json`
   - self-hosted Renovate settings
   - updates for tool and image values in `config/project.cfg`

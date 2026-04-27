@@ -14,10 +14,11 @@ Do not add a `Makefile`, workflow scripts, generated `dist/`, local `data/`,
 ## Read First
 
 - Read `../AGENTS.md` for repository-wide rules and skill routing.
-- Read `IMPLEMENTATION-PLAN.md` for current implementation status, remaining required work, and optional backlog.
-- As of `IMPLEMENTATION-PLAN.md` dated 2026-04-24, autosave drafts are the only
-  required feature gap. Do not describe autosave as complete until code, tests,
-  and docs are updated.
+- Read `../docs/IMPLEMENTATION-PLAN.md` for current implementation status,
+  remaining required work, and optional backlog.
+- As of `../docs/IMPLEMENTATION-PLAN.md` dated 2026-04-24, autosave drafts are
+  the only required feature gap. Do not describe autosave as complete until
+  code, tests, and docs are updated.
 
 ## App Architecture
 
@@ -25,7 +26,8 @@ Do not add a `Makefile`, workflow scripts, generated `dist/`, local `data/`,
 - `internal/app/`: app wiring and configuration.
 - `internal/http/`: routes, middleware, handlers, and view rendering.
 - `internal/domain/`: core domain types.
-- `internal/store/`: SQLite/libSQL persistence, migrations, retry logic, and store tests.
+- `internal/store/`: SQLite/libSQL persistence, migrations, retry logic, and
+  store tests.
 - `internal/content/`: Markdown rendering and sanitization.
 - `internal/publish/`: static-site publishing pipeline.
 - `web/templates/`: server-rendered Go templates and HTMX partials.
@@ -66,18 +68,26 @@ Also run `make publish` or `make preview` when static publishing changes, and
 - Preserve session auth, secure cookie settings, CSRF middleware, HTMX CSRF
   header injection, MFA, RBAC, author ownership checks, rate limits, and
   self-lockout guards.
-- Keep state-changing admin routes protected by auth, CSRF, authorization, and validation.
-- Do not allow autosave, drafts, publish/unpublish, or static publishing to overwrite canonical content state unexpectedly.
-- Keep Markdown rendering server-side and sanitized before any use of `template.HTML`.
-- Do not use trusted template types for untrusted content unless sanitization is explicit and covered by tests.
+- Keep state-changing admin routes protected by auth, CSRF, authorization, and
+  validation.
+- Do not allow autosave, drafts, publish/unpublish, or static publishing to
+  overwrite canonical content state unexpectedly.
+- Keep Markdown rendering server-side and sanitized before any use of
+  `template.HTML`.
+- Do not use trusted template types for untrusted content unless sanitization is
+  explicit and covered by tests.
 - Keep uploaded media validation strict: size limits, MIME allowlist,
-  magic-byte/content checks, image decode verification, randomized stored names, and quota enforcement.
+  magic-byte/content checks, image decode verification, randomized stored
+  names, and quota enforcement.
 - Keep local SQLite single-writer settings, WAL, foreign keys, busy timeout,
   remote/replica behavior, and admin read-your-writes rules intact.
-- Use retry wrappers only for transient failures and keep retried writes idempotent through stable IDs or conflict-as-success semantics.
+- Use retry wrappers only for transient failures and keep retried writes
+  idempotent through stable IDs or conflict-as-success semantics.
 - Do not perform external IO inside database transactions.
-- Treat proxy-derived client IP, scheme, and host values as untrusted unless trusted proxy CIDRs are explicitly enforced.
-- Keep secrets, tokens, private URLs, local databases, uploads, and generated runtime artifacts out of source, docs, examples, logs, and commits.
+- Treat proxy-derived client IP, scheme, and host values as untrusted unless
+  trusted proxy CIDRs are explicitly enforced.
+- Keep secrets, tokens, private URLs, local databases, uploads, and generated
+  runtime artifacts out of source, docs, examples, logs, and commits.
 
 ## Testing
 
@@ -86,23 +96,29 @@ Also run `make publish` or `make preview` when static publishing changes, and
 - Do not write tests for prose-only documentation, filenames, or directory layout.
 - For security-sensitive changes, cover successful behavior plus unauthorized,
   forbidden, validation-failure, and stale/conflict paths where applicable.
-- For HTMX handlers, verify status codes, fragments, redirects, and target contract behavior.
-- For publish changes, verify generated files, feeds, sitemap, manifest updates, and orphan cleanup.
+- For HTMX handlers, verify status codes, fragments, redirects, and target
+  contract behavior.
+- For publish changes, verify generated files, feeds, sitemap, manifest
+  updates, and orphan cleanup.
 
 ## Templates And UI
 
 - Keep the app server-rendered; do not turn admin flows into a SPA.
-- Preserve the HTMX partial contract for `#flash`, `#modal`, `#posts-table`, and `#row-{id}` where those targets apply.
-- Keep successful HTMX navigations using `HX-Redirect` when full-page navigation is intended.
-- Return validation and middleware errors as fragments where existing handlers do that today.
-- Keep HTMX and other runtime assets self-hosted unless the task explicitly changes the asset policy.
+- Preserve the HTMX partial contract for `#flash`, `#modal`, `#posts-table`,
+  and `#row-{id}` where those targets apply.
+- Keep successful HTMX navigations using `HX-Redirect` when full-page
+  navigation is intended.
+- Return validation and middleware errors as fragments where existing handlers
+  do that today.
+- Keep HTMX and other runtime assets self-hosted unless the task explicitly
+  changes the asset policy.
 
 ## Documentation
 
 - Update the root `README.md` when app setup, commands, routes, configuration,
   security posture, or user-visible behavior changes.
-- Update `IMPLEMENTATION-PLAN.md` when current status, required remaining work,
-  optional backlog, or completion criteria change.
+- Update `../docs/IMPLEMENTATION-PLAN.md` when current status, required
+  remaining work, optional backlog, or completion criteria change.
 - Keep documentation grounded in root commands and routes that exist.
 
 ## Comments

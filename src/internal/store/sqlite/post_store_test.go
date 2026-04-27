@@ -79,6 +79,69 @@ func TestPostStoreSlugConflict(t *testing.T) {
 	}
 }
 
+// TestPostStoreUpdatePostPublishesDraftOnce explains one unit of behavior in this package.
+// In Go, functions often return early on errors to keep the success path simple.
+func TestPostStoreUpdatePostPublishesDraftOnce(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newTestAuthStore(t)
+
+	user := domain.User{ID: "u-publish-edit", Email: "publish-edit@example.com", PasswordHash: "x", Role: domain.RoleAdmin}
+	mustNoErr(t, store.CreateUser(ctx, user))
+
+	mustNoErr(t, store.CreatePost(ctx, domain.Post{
+		ID:       "p-publish-edit",
+		Type:     domain.PostTypePost,
+		Title:    "Draft",
+		Slug:     "draft-to-published",
+		BodyMD:   "draft",
+		Status:   domain.PostStatusDraft,
+		AuthorID: user.ID,
+	}))
+
+	publishedAt := time.Now().UTC().Add(-time.Hour)
+	updated, err := store.UpdatePost(ctx, domain.Post{
+		ID:          "p-publish-edit",
+		Type:        domain.PostTypePost,
+		Title:       "Published",
+		Slug:        "draft-to-published",
+		BodyMD:      "published",
+		Status:      domain.PostStatusPublished,
+		PublishedAt: &publishedAt,
+	}, user)
+	mustNoErr(t, err)
+	if !updated {
+		t.Fatalf("expected update to affect row")
+	}
+
+	post, err := store.GetPostByID(ctx, "p-publish-edit")
+	mustNoErr(t, err)
+	if post.PublishedAt == nil || !post.PublishedAt.Equal(publishedAt) {
+		t.Fatalf("expected first publish time %v, got %v", publishedAt, post.PublishedAt)
+	}
+
+	republishAt := time.Now().UTC()
+	updated, err = store.UpdatePost(ctx, domain.Post{
+		ID:          "p-publish-edit",
+		Type:        domain.PostTypePost,
+		Title:       "Still Published",
+		Slug:        "draft-to-published",
+		BodyMD:      "edited",
+		Status:      domain.PostStatusPublished,
+		PublishedAt: &republishAt,
+	}, user)
+	mustNoErr(t, err)
+	if !updated {
+		t.Fatalf("expected second update to affect row")
+	}
+
+	post, err = store.GetPostByID(ctx, "p-publish-edit")
+	mustNoErr(t, err)
+	if post.PublishedAt == nil || !post.PublishedAt.Equal(publishedAt) {
+		t.Fatalf("expected existing publish time %v, got %v", publishedAt, post.PublishedAt)
+	}
+}
+
 // TestPostStoreCreatePostIDConflictTreatedAsSuccess explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func TestPostStoreCreatePostIDConflictTreatedAsSuccess(t *testing.T) {

@@ -1,6 +1,7 @@
 # kcNotes
 
-kcNotes is content management system (CMS), written in Go + HTMX, with container-driven workflows.
+kcNotes is content management system (CMS), written in Go + HTMX, with
+container-driven workflows.
 
 ## Demo
 
@@ -13,7 +14,8 @@ kcNotes is content management system (CMS), written in Go + HTMX, with container
 - SQLite/libSQL storage with local, remote Turso, and optional replica modes.
 - Session auth, CSRF protection, MFA, RBAC, rate limiting, and account lockout.
 - Posts/pages, media uploads, settings, audit log, search, and static publishing.
-- Root-owned Docker, Make, GitHub Actions, security scan, dependency update, and release integrity workflows.
+- Root-owned Docker, Make, GitHub Actions, security scan, dependency update,
+  and release integrity workflows.
 
 ## Quick Start
 
@@ -48,13 +50,15 @@ Core app commands:
 - `make migrate`: applies database migrations.
 - `make create-user`: creates a user from `EMAIL`, `PASSWORD`, and `ROLE`.
 - `make run`: applies pending migrations, then starts the CMS.
-- `make publish`: writes the static site to `dist/site` unless `PUBLISH_OUT_DIR` is set.
+- `make publish`: writes the static site to `dist/site` unless
+  `PUBLISH_OUT_DIR` is set.
 - `make preview`: serves the published static site.
 - `make smoke`: runs HTTP smoke probes.
 - `make stop`: stops managed kcNotes containers.
 - `make logs`: prints managed container logs.
 - `make status`: shows the app image and managed containers.
-- `make clean`: removes generated artifacts, caches, local DB files, and managed containers.
+- `make clean`: removes generated artifacts, caches, local DB files, and
+  managed containers.
 
 Maintenance commands:
 
@@ -86,7 +90,8 @@ The root Make targets run these modes in the project container:
 
 - `go run ./cmd/cms -mode serve`
 - `go run ./cmd/cms -mode migrate`
-- `go run ./cmd/cms -mode create-user -email admin@example.com -password 'change-me-now' -role admin`
+- `go run ./cmd/cms -mode create-user -email admin@example.com`
+  `-password 'change-me-now' -role admin`
 - `go run ./cmd/cms -mode publish`
 - `go run ./cmd/cms -mode preview`
 
@@ -169,4 +174,5 @@ references so this list stays current.
 
 ## License
 
-This project is free for personal use. Commercial usage requires a license. See [`LICENSE.md`](LICENSE.md) for more details.
+This project is free for personal use. Commercial usage requires a license.
+See [`LICENSE.md`](LICENSE.md) for more details.

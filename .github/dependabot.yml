@@ -48,3 +48,43 @@ updates:
         update-types:
           - "minor"
           - "patch"
+
+  # Check Go module dependencies used by the CMS source.
+  - package-ecosystem: "gomod"
+    directory: "/src"
+    schedule:
+      interval: "monthly"
+    # Wait before opening normal version-update PRs so newly released modules
+    # have time for malicious releases, yanks, or incident reports to surface.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "[dependabot]"
+      include: "scope"
+    groups:
+      go-modules:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Check npm dependencies used by the Tailwind build.
+  - package-ecosystem: "npm"
+    directory: "/src"
+    schedule:
+      interval: "monthly"
+    # Wait before opening normal version-update PRs so newly released packages
+    # have time for malicious releases, yanks, or incident reports to surface.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "[dependabot]"
+      include: "scope"
+    groups:
+      npm:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

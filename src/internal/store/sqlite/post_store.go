@@ -295,10 +295,20 @@ func (s *AuthStore) UpdatePost(ctx context.Context, post domain.Post, actor doma
 
 	query := `
 		UPDATE posts
-		SET type = ?, title = ?, slug = ?, body_md = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+		SET type = ?,
+			title = ?,
+			slug = ?,
+			body_md = ?,
+			status = ?,
+			published_at = CASE
+				WHEN ? IS NOT NULL AND published_at IS NULL THEN ?
+				ELSE published_at
+			END,
+			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
-	args := []any{string(post.Type), post.Title, post.Slug, post.BodyMD, string(post.Status), post.ID}
+	publishedAt := nullableTime(post.PublishedAt)
+	args := []any{string(post.Type), post.Title, post.Slug, post.BodyMD, string(post.Status), publishedAt, publishedAt, post.ID}
 	if actor.Role == domain.RoleAuthor {
 		query += " AND author_id = ?"
 		args = append(args, actor.ID)
