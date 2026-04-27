@@ -24,9 +24,9 @@ agent-support files.
 Before changing app behavior, read:
 
 1. `src/AGENTS.md` for source-tree architecture, security rules, and coding expectations.
-2. `src/IMPLEMENTATION-PLAN.md` for current implementation status and remaining required work.
+2. `docs/IMPLEMENTATION-PLAN.MD` for current implementation status and remaining required work.
 
-As of `src/IMPLEMENTATION-PLAN.md` dated 2026-04-24, autosave drafts are the
+As of `docs/IMPLEMENTATION-PLAN.MD` dated 2026-04-24, autosave drafts are the
 only required feature gap. Do not describe autosave as complete until the code,
 tests, and docs are updated.
 
