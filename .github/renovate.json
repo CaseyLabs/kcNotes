@@ -19,16 +19,45 @@
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}docker{{/if}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Update tool versions in config/project.cfg",
+      "managerFilePatterns": [
+        "/^config\\/project\\.cfg$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>go|npm) depName=(?<depName>\\S+)(?: packageName=(?<packageName>\\S+))?(?: versioning=(?<versioning>\\S+))?\\s+[A-Z0-9_]+\\s*=\\s*['\"](?<currentValue>[^'\"]+)['\"]"
+      ],
+      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver-coerced{{/if}}"
+    },
+    {
+      "customType": "regex",
+      "description": "Update vendored HTMX from npm",
+      "managerFilePatterns": [
+        "/^src\\/package\\.json$/"
+      ],
+      "matchStrings": [
+        "\"htmx\\.org\"\\s*:\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "npm",
+      "depNameTemplate": "htmx.org",
+      "versioningTemplate": "npm"
     }
   ],
   "postUpgradeTasks": {
     "commands": [
-      "sh scripts/update.sh config/project.cfg"
+      "sh scripts/update.sh config/project.cfg",
+      "sh scripts/vendor-assets.sh config/project.cfg"
     ],
     "fileFilters": [
       "README.md",
       "config/project.cfg",
-      "config/lockfile.cfg"
+      "config/lockfile.cfg",
+      "src/package.json",
+      "src/package-lock.json",
+      "src/web/static/js/vendor/htmx-*.min.js",
+      "src/web/templates/layouts/base.tmpl"
     ],
     "executionMode": "branch"
   },

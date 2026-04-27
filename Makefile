@@ -62,6 +62,9 @@ shell: ## opens a shell in the kcNotes image
 update: ## refreshes pinned SHA hashes
 	sh scripts/update.sh "$(PROJECT_CFG_FILE)"
 
+vendor-assets: ## refreshes checked-in third-party static assets
+	sh scripts/vendor-assets.sh "$(PROJECT_CFG_FILE)"
+
 renovate: ## runs self-hosted Renovate for this repository
 	sh scripts/renovate.sh "$(PROJECT_CFG_FILE)"
 

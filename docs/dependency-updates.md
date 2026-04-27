@@ -24,16 +24,19 @@ malicious releases, or incident reports have time to surface.
 Self-hosted Renovate is configured in `.github/renovate.json` and runs through
 `make renovate`.
 
-It updates reviewed image selectors in `config/project.cfg`, including tool
-images. After updating those selectors, Renovate is allowed to run:
+It updates reviewed image and tool selectors in `config/project.cfg`, plus the
+npm selector for the checked-in HTMX browser asset. After updating those
+selectors, Renovate is allowed to run:
 
 ```sh
 sh scripts/update.sh config/project.cfg
+sh scripts/vendor-assets.sh config/project.cfg
 ```
 
-That command refreshes immutable locks in `config/lockfile.cfg` and syncs related
-generated references. Keeping selectors and locks together makes dependency
-changes easier to review.
+Those commands refresh immutable locks in `config/lockfile.cfg`, sync related
+generated references, refresh `src/package-lock.json`, and copy the pinned HTMX
+asset into `src/web/static/js/vendor/`. Keeping selectors and generated outputs
+together makes dependency changes easier to review.
 
 ## GitHub App Token
 
@@ -53,6 +56,7 @@ For dependency update PRs:
 
 - confirm the version selector changed for the intended dependency
 - confirm `config/lockfile.cfg` changed when a locked image was updated
+- confirm vendored browser assets changed when their npm selector changed
 - keep full-SHA action pins and reviewed tag comments intact
 - run the relevant `make` target locally or rely on the matching required check
 - pay extra attention to updates for build, release, scan, and credentialed

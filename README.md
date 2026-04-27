@@ -65,6 +65,7 @@ Maintenance commands:
 - `make scan`: runs secret scanning and workflow policy checks.
 - `make dist`: builds kcNotes release artifacts and integrity outputs under `dist/`.
 - `make update`: refreshes pinned image digests and workflow allowlist docs.
+- `make vendor-assets`: refreshes checked-in third-party static assets.
 - `make renovate`: runs self-hosted Renovate.
 
 ## Public Routes

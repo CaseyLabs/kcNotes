@@ -114,7 +114,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
         params = urllib.parse.parse_qs(parsed.query)
         code = params.get("code", [""])[0]
         state = params.get("state", [""])[0]
-        outfile.write_text(code + "\n" + state + "\n", encoding="utf-8")
+        error = params.get("error", [""])[0]
+        error_description = params.get("error_description", [""])[0]
+        raw_query = parsed.query
+        outfile.write_text(
+            code + "\n" +
+            state + "\n" +
+            error + "\n" +
+            error_description + "\n" +
+            raw_query + "\n",
+            encoding="utf-8",
+        )
 
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
@@ -227,8 +237,22 @@ fi
 
 CODE="$(sed -n '1p' "${CALLBACK_FILE}")"
 RETURNED_STATE="$(sed -n '2p' "${CALLBACK_FILE}")"
+CALLBACK_ERROR="$(sed -n '3p' "${CALLBACK_FILE}")"
+CALLBACK_ERROR_DESCRIPTION="$(sed -n '4p' "${CALLBACK_FILE}")"
+CALLBACK_QUERY="$(sed -n '5p' "${CALLBACK_FILE}")"
 
 if [[ -z "${CODE}" ]]; then
+	if [[ -n "${CALLBACK_ERROR}" || -n "${CALLBACK_ERROR_DESCRIPTION}" ]]; then
+		echo "Error: GitHub returned an error instead of a manifest code." >&2
+		echo "  error: ${CALLBACK_ERROR:-<empty>}" >&2
+		echo "  description: ${CALLBACK_ERROR_DESCRIPTION:-<empty>}" >&2
+		exit 1
+	fi
+	if [[ -n "${CALLBACK_QUERY}" ]]; then
+		echo "Error: callback did not include a manifest code." >&2
+		echo "  callback query: ${CALLBACK_QUERY}" >&2
+		exit 1
+	fi
 	echo "Error: callback did not include a manifest code." >&2
 	exit 1
 fi

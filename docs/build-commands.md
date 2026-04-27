@@ -29,6 +29,7 @@ details so local use and GitHub Actions share the same behavior.
   checks.
 - `make update`: resolves reviewed image selectors into digest locks and syncs
   generated references.
+- `make vendor-assets`: refreshes checked-in third-party static assets.
 - `make renovate`: runs self-hosted Renovate when enabled.
 - `make dist`: builds kcNotes release artifacts and integrity outputs under `dist/`.
 
@@ -58,6 +59,8 @@ tests, scans, and release steps run through Docker images selected by
 This keeps local development, CI, and release behavior close together. It also
 makes dependency changes reviewable: normal version selectors live in
 `config/project.cfg`, while immutable lock values are refreshed by `make update`.
+Checked-in third-party browser assets are refreshed by `make vendor-assets` from
+npm-managed selectors.
 
 ## CI Alignment
 
