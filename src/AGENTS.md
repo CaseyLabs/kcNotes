@@ -16,9 +16,8 @@ Do not add a `Makefile`, workflow scripts, generated `dist/`, local `data/`,
 - Read `../AGENTS.md` for repository-wide rules and skill routing.
 - Read `../docs/IMPLEMENTATION-PLAN.md` for current implementation status,
   remaining required work, and optional backlog.
-- As of `../docs/IMPLEMENTATION-PLAN.md` dated 2026-04-24, autosave drafts are
-  the only required feature gap. Do not describe autosave as complete until
-  code, tests, and docs are updated.
+- As of `../docs/IMPLEMENTATION-PLAN.md` dated 2026-04-30, the required R1
+  autosave scope is implemented for existing post/page edit forms.
 
 ## App Architecture
 

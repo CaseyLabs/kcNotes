@@ -457,6 +457,15 @@ html[data-theme="dark"] {
     background-color: var(--color-danger-bg);
     color: var(--color-danger-text);
   }
+
+  .htmx-indicator {
+    display: none;
+  }
+
+  .htmx-request .htmx-indicator,
+  .htmx-request.htmx-indicator {
+    display: inline;
+  }
 }
 
 @layer utilities {

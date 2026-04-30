@@ -56,6 +56,156 @@ func TestPostStoreAuthorScopeAndOwnership(t *testing.T) {
 	}
 }
 
+func TestPostStoreAutosaveSnapshots(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newTestAuthStore(t)
+
+	author := domain.User{ID: "u-autosave", Email: "autosave@example.com", PasswordHash: "x", Role: domain.RoleAuthor}
+	other := domain.User{ID: "u-autosave-other", Email: "autosave-other@example.com", PasswordHash: "x", Role: domain.RoleAuthor}
+	mustNoErr(t, store.CreateUser(ctx, author))
+	mustNoErr(t, store.CreateUser(ctx, other))
+	mustNoErr(t, store.CreatePost(ctx, domain.Post{ID: "p-autosave", Type: domain.PostTypePost, Title: "Original", Slug: "original", BodyMD: "body", Status: domain.PostStatusDraft, AuthorID: author.ID}))
+
+	post, err := store.GetPostByID(ctx, "p-autosave")
+	mustNoErr(t, err)
+	created, err := store.UpsertAutosaveSnapshot(ctx, domain.AutosaveSnapshot{
+		PostID:        post.ID,
+		AuthorID:      author.ID,
+		Type:          domain.PostTypePost,
+		Title:         "Draft one",
+		Slug:          "draft-one",
+		BodyMD:        "one",
+		Status:        domain.PostStatusDraft,
+		BaseUpdatedAt: post.UpdatedAt,
+	}, author)
+	mustNoErr(t, err)
+	if !created {
+		t.Fatalf("expected autosave insert")
+	}
+
+	updated, err := store.UpsertAutosaveSnapshot(ctx, domain.AutosaveSnapshot{
+		PostID:        post.ID,
+		AuthorID:      author.ID,
+		Type:          domain.PostTypePage,
+		Title:         "Draft two",
+		Slug:          "draft-two",
+		BodyMD:        "two",
+		Status:        domain.PostStatusArchived,
+		BaseUpdatedAt: post.UpdatedAt,
+	}, author)
+	mustNoErr(t, err)
+	if !updated {
+		t.Fatalf("expected autosave update")
+	}
+
+	snapshot, err := store.GetLatestAutosaveSnapshot(ctx, post.ID, author.ID)
+	mustNoErr(t, err)
+	if snapshot.Title != "Draft two" || snapshot.Type != domain.PostTypePage || snapshot.BodyMD != "two" {
+		t.Fatalf("expected latest snapshot to replace old values, got %+v", snapshot)
+	}
+
+	_, err = store.GetLatestAutosaveSnapshot(ctx, post.ID, other.ID)
+	if err != ErrNotFound {
+		t.Fatalf("expected other user snapshot lookup to miss, got %v", err)
+	}
+
+	dismissed, err := store.DismissAutosaveSnapshot(ctx, post.ID, other.ID)
+	mustNoErr(t, err)
+	if dismissed {
+		t.Fatalf("expected dismiss for other user to leave actor snapshot")
+	}
+	_, err = store.GetLatestAutosaveSnapshot(ctx, post.ID, author.ID)
+	mustNoErr(t, err)
+
+	dismissed, err = store.DismissAutosaveSnapshot(ctx, post.ID, author.ID)
+	mustNoErr(t, err)
+	if !dismissed {
+		t.Fatalf("expected actor snapshot to be dismissed")
+	}
+	_, err = store.GetLatestAutosaveSnapshot(ctx, post.ID, author.ID)
+	if err != ErrNotFound {
+		t.Fatalf("expected dismissed snapshot to miss, got %v", err)
+	}
+}
+
+func TestPostStoreAutosaveOwnershipAndStaleBase(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newTestAuthStore(t)
+
+	author := domain.User{ID: "u-autosave-owner", Email: "autosave-owner@example.com", PasswordHash: "x", Role: domain.RoleAuthor}
+	other := domain.User{ID: "u-autosave-blocked", Email: "autosave-blocked@example.com", PasswordHash: "x", Role: domain.RoleAuthor}
+	mustNoErr(t, store.CreateUser(ctx, author))
+	mustNoErr(t, store.CreateUser(ctx, other))
+	mustNoErr(t, store.CreatePost(ctx, domain.Post{ID: "p-autosave-owner", Type: domain.PostTypePost, Title: "Original", Slug: "autosave-owner", BodyMD: "body", Status: domain.PostStatusDraft, AuthorID: author.ID}))
+
+	post, err := store.GetPostByID(ctx, "p-autosave-owner")
+	mustNoErr(t, err)
+	blocked, err := store.UpsertAutosaveSnapshot(ctx, domain.AutosaveSnapshot{
+		PostID:        post.ID,
+		AuthorID:      other.ID,
+		Type:          domain.PostTypePost,
+		Title:         "Blocked",
+		Slug:          "blocked",
+		BodyMD:        "blocked",
+		Status:        domain.PostStatusDraft,
+		BaseUpdatedAt: post.UpdatedAt,
+	}, other)
+	mustNoErr(t, err)
+	if blocked {
+		t.Fatalf("expected author autosave on non-owned post to be blocked")
+	}
+
+	stale, err := store.UpsertAutosaveSnapshot(ctx, domain.AutosaveSnapshot{
+		PostID:        post.ID,
+		AuthorID:      author.ID,
+		Type:          domain.PostTypePost,
+		Title:         "Stale",
+		Slug:          "stale",
+		BodyMD:        "stale",
+		Status:        domain.PostStatusDraft,
+		BaseUpdatedAt: post.UpdatedAt.Add(-time.Hour),
+	}, author)
+	mustNoErr(t, err)
+	if stale {
+		t.Fatalf("expected stale base update to be rejected")
+	}
+}
+
+func TestPostStorePublicQueriesIgnoreAutosaveSnapshots(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newTestAuthStore(t)
+
+	user := domain.User{ID: "u-autosave-public", Email: "autosave-public@example.com", PasswordHash: "x", Role: domain.RoleAdmin}
+	mustNoErr(t, store.CreateUser(ctx, user))
+	mustNoErr(t, store.CreatePost(ctx, domain.Post{ID: "p-autosave-public", Type: domain.PostTypePost, Title: "Canonical", Slug: "canonical", BodyMD: "public", Status: domain.PostStatusPublished, AuthorID: user.ID}))
+	post, err := store.GetPostByID(ctx, "p-autosave-public")
+	mustNoErr(t, err)
+
+	ok, err := store.UpsertAutosaveSnapshot(ctx, domain.AutosaveSnapshot{
+		PostID:        post.ID,
+		AuthorID:      user.ID,
+		Type:          domain.PostTypePost,
+		Title:         "Autosaved",
+		Slug:          "autosaved",
+		BodyMD:        "private",
+		Status:        domain.PostStatusDraft,
+		BaseUpdatedAt: post.UpdatedAt,
+	}, user)
+	mustNoErr(t, err)
+	if !ok {
+		t.Fatalf("expected autosave snapshot")
+	}
+
+	posts, err := store.ListPublicPosts(ctx, false, 10)
+	mustNoErr(t, err)
+	if len(posts) != 1 || posts[0].Title != "Canonical" || posts[0].BodyMD != "public" {
+		t.Fatalf("expected public query to use canonical post only, got %+v", posts)
+	}
+}
+
 // TestPostStoreSlugConflict explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func TestPostStoreSlugConflict(t *testing.T) {

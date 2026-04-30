@@ -66,6 +66,9 @@ type adminStore interface {
 	GetPostByID(ctx context.Context, id string) (domain.Post, error)
 	CreatePost(ctx context.Context, post domain.Post) error
 	UpdatePost(ctx context.Context, post domain.Post, actor domain.User) (bool, error)
+	UpsertAutosaveSnapshot(ctx context.Context, snapshot domain.AutosaveSnapshot, actor domain.User) (bool, error)
+	GetLatestAutosaveSnapshot(ctx context.Context, postID, authorID string) (domain.AutosaveSnapshot, error)
+	DismissAutosaveSnapshot(ctx context.Context, postID, authorID string) (bool, error)
 	SetPostStatus(ctx context.Context, id string, status domain.PostStatus, publishedAt *time.Time, actor domain.User) (bool, error)
 	SoftDeletePost(ctx context.Context, id string, actor domain.User) (bool, error)
 	CreateMedia(ctx context.Context, media domain.Media) error

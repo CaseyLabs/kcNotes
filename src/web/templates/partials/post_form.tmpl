@@ -10,14 +10,30 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 */}}
 
 {{ define "partial-post-form" }}
-<div class="panel">
+<div id="post-form-panel" class="panel">
+  {{ if .AutosaveSnapshot }}
+    <div class="flash-warning mb-4" id="autosave-recovery">
+      <p>A newer autosave is available for this editor.</p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <form method="post" action="/admin/posts/{{ .Form.ID }}/autosave/restore" hx-post="/admin/posts/{{ .Form.ID }}/autosave/restore" hx-target="#post-form-panel" hx-swap="outerHTML">
+          <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+          <button class="btn btn-primary focus-ring" type="submit">Restore Autosave</button>
+        </form>
+        <form method="post" action="/admin/posts/{{ .Form.ID }}/autosave/dismiss" hx-post="/admin/posts/{{ .Form.ID }}/autosave/dismiss" hx-target="#post-form-panel" hx-swap="outerHTML">
+          <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+          <button class="btn btn-secondary focus-ring" type="submit">Dismiss</button>
+        </form>
+      </div>
+    </div>
+  {{ end }}
   {{ if .FormErrors }}
     <div class="flash-error mb-4">
       {{ range .FormErrors }}<p>{{ . }}</p>{{ end }}
     </div>
   {{ end }}
-  <form class="space-y-4" method="post" action="{{ .FormAction }}">
+  <form class="space-y-4" method="post" action="{{ .FormAction }}" {{ if .IsEdit }}hx-post="/admin/posts/{{ .Form.ID }}/autosave" hx-trigger="input changed delay:4s, change changed delay:4s" hx-target="#autosave-status" hx-swap="outerHTML" hx-indicator="#autosave-saving"{{ end }}>
     <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+    {{ if .IsEdit }}<input type="hidden" name="base_updated_at" value="{{ .Form.BaseUpdatedAt }}" />{{ end }}
 
     <div class="grid gap-4 md:grid-cols-3">
       <label class="text-sm muted">
@@ -54,7 +70,15 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
     <div class="flex flex-wrap gap-2">
       <button class="btn btn-primary focus-ring" type="submit">{{ .SubmitLabel }}</button>
       <a href="/admin/posts" class="btn btn-secondary focus-ring">Cancel</a>
+      {{ if .IsEdit }}
+        <span id="autosave-status" class="muted self-center text-sm"></span>
+        <span id="autosave-saving" class="htmx-indicator muted self-center text-sm">Saving...</span>
+      {{ end }}
     </div>
   </form>
 </div>
+{{ end }}
+
+{{ define "partial-autosave-status" }}
+<span id="autosave-status" class="muted self-center text-sm">{{ .AutosaveStatus }}</span>
 {{ end }}

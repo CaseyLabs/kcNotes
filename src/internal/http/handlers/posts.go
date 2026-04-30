@@ -30,12 +30,13 @@ const defaultPostPageSize = 10
 var slugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 
 type postFormData struct {
-	ID     string
-	Type   domain.PostType
-	Title  string
-	Slug   string
-	BodyMD string
-	Status domain.PostStatus
+	ID            string
+	Type          domain.PostType
+	Title         string
+	Slug          string
+	BodyMD        string
+	Status        domain.PostStatus
+	BaseUpdatedAt string
 }
 
 // PostsPage explains one unit of behavior in this package.
@@ -179,8 +180,11 @@ func (h *Admin) EditPostForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	form := postFormData{ID: post.ID, Type: post.Type, Title: post.Title, Slug: post.Slug, BodyMD: post.BodyMD, Status: post.Status}
+	form := postFormData{ID: post.ID, Type: post.Type, Title: post.Title, Slug: post.Slug, BodyMD: post.BodyMD, Status: post.Status, BaseUpdatedAt: formatFormTime(post.UpdatedAt)}
 	data := h.postFormTemplateData(r, user, form, nil, true)
+	if snapshot, ok := h.newerAutosaveSnapshot(r, post, user); ok {
+		data["AutosaveSnapshot"] = snapshot
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if middleware.IsHTMX(r) {
 		_ = h.renderer.Render(w, "partial-post-form", data)
@@ -245,6 +249,121 @@ func (h *Admin) UpdatePost(w http.ResponseWriter, r *http.Request) {
 	h.auditEvent(r, user.ID, "post_update", "post", id)
 
 	h.redirectAfterWrite(w, r, "/admin/posts", "Post updated")
+}
+
+// AutosavePost stores a private recovery snapshot without changing canonical content.
+func (h *Admin) AutosavePost(w http.ResponseWriter, r *http.Request) {
+	user, ok := middleware.CurrentUser(r)
+	if !ok {
+		h.renderError(w, r, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		h.renderError(w, r, http.StatusBadRequest, "invalid form")
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	post, err := h.loadWritablePost(r, w, id, user)
+	if err != nil {
+		return
+	}
+
+	form, validationErrors := parseAndValidatePostForm(r, false)
+	form.ID = id
+	form.BaseUpdatedAt = strings.TrimSpace(r.FormValue("base_updated_at"))
+	if len(validationErrors) > 0 {
+		h.renderAutosaveStatus(w, http.StatusUnprocessableEntity, "Failed")
+		return
+	}
+	baseUpdatedAt, err := parseFormTime(form.BaseUpdatedAt)
+	if err != nil {
+		h.renderAutosaveStatus(w, http.StatusConflict, "Conflict")
+		return
+	}
+	if !post.UpdatedAt.Equal(baseUpdatedAt) {
+		h.renderAutosaveStatus(w, http.StatusConflict, "Conflict")
+		return
+	}
+
+	ok, err = h.store.UpsertAutosaveSnapshot(r.Context(), domain.AutosaveSnapshot{
+		PostID:        id,
+		AuthorID:      user.ID,
+		Type:          form.Type,
+		Title:         form.Title,
+		Slug:          form.Slug,
+		BodyMD:        form.BodyMD,
+		Status:        form.Status,
+		BaseUpdatedAt: baseUpdatedAt,
+	}, user)
+	if err != nil {
+		h.renderError(w, r, http.StatusInternalServerError, "failed to autosave post")
+		return
+	}
+	if !ok {
+		h.renderAutosaveStatus(w, http.StatusConflict, "Conflict")
+		return
+	}
+	h.renderAutosaveStatus(w, http.StatusOK, "Saved")
+}
+
+// RestoreAutosavePost returns the edit form populated from the user's snapshot.
+func (h *Admin) RestoreAutosavePost(w http.ResponseWriter, r *http.Request) {
+	user, ok := middleware.CurrentUser(r)
+	if !ok {
+		h.renderError(w, r, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	post, err := h.loadWritablePost(r, w, id, user)
+	if err != nil {
+		return
+	}
+	snapshot, err := h.store.GetLatestAutosaveSnapshot(r.Context(), id, user.ID)
+	if err != nil {
+		if errors.Is(err, storesqlite.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		h.renderError(w, r, http.StatusInternalServerError, "failed to load autosave")
+		return
+	}
+	form := postFormData{ID: post.ID, Type: snapshot.Type, Title: snapshot.Title, Slug: snapshot.Slug, BodyMD: snapshot.BodyMD, Status: snapshot.Status, BaseUpdatedAt: formatFormTime(post.UpdatedAt)}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = h.renderer.Render(w, "partial-post-form", h.postFormTemplateData(r, user, form, nil, true))
+}
+
+// DismissAutosavePost removes the recovery snapshot and returns the canonical form.
+func (h *Admin) DismissAutosavePost(w http.ResponseWriter, r *http.Request) {
+	user, ok := middleware.CurrentUser(r)
+	if !ok {
+		h.renderError(w, r, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	post, err := h.loadWritablePost(r, w, id, user)
+	if err != nil {
+		return
+	}
+	_, err = h.store.DismissAutosaveSnapshot(r.Context(), id, user.ID)
+	if err != nil {
+		h.renderError(w, r, http.StatusInternalServerError, "failed to dismiss autosave")
+		return
+	}
+	form := postFormData{ID: post.ID, Type: post.Type, Title: post.Title, Slug: post.Slug, BodyMD: post.BodyMD, Status: post.Status, BaseUpdatedAt: formatFormTime(post.UpdatedAt)}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = h.renderer.Render(w, "partial-post-form", h.postFormTemplateData(r, user, form, nil, true))
 }
 
 // QuickEditPost explains one unit of behavior in this package.
@@ -496,6 +615,12 @@ func (h *Admin) renderPostFormError(w http.ResponseWriter, r *http.Request, user
 	_ = h.renderer.Render(w, "admin-post-form", data)
 }
 
+func (h *Admin) renderAutosaveStatus(w http.ResponseWriter, status int, label string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	_ = h.renderer.Render(w, "partial-autosave-status", map[string]any{"AutosaveStatus": label})
+}
+
 // postsListData explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func (h *Admin) postsListData(r *http.Request, user domain.User, filter storesqlite.PostListFilter, posts []domain.Post, total int) map[string]any {
@@ -572,6 +697,31 @@ func (h *Admin) postFormTemplateData(r *http.Request, user domain.User, form pos
 	}
 }
 
+func (h *Admin) newerAutosaveSnapshot(r *http.Request, post domain.Post, user domain.User) (domain.AutosaveSnapshot, bool) {
+	snapshot, err := h.store.GetLatestAutosaveSnapshot(r.Context(), post.ID, user.ID)
+	if err != nil {
+		return domain.AutosaveSnapshot{}, false
+	}
+	return snapshot, snapshot.UpdatedAt.After(post.UpdatedAt)
+}
+
+func (h *Admin) loadWritablePost(r *http.Request, w http.ResponseWriter, id string, user domain.User) (domain.Post, error) {
+	post, err := h.store.GetPostByID(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, storesqlite.ErrNotFound) {
+			http.NotFound(w, r)
+			return domain.Post{}, err
+		}
+		h.renderError(w, r, http.StatusInternalServerError, "failed to load post")
+		return domain.Post{}, err
+	}
+	if !canAccessPost(user, post) || post.DeletedAt != nil {
+		http.NotFound(w, r)
+		return domain.Post{}, storesqlite.ErrNotFound
+	}
+	return post, nil
+}
+
 // parsePostListFilter explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func parsePostListFilter(r *http.Request, user domain.User) storesqlite.PostListFilter {
@@ -633,6 +783,14 @@ func parseAndValidatePostForm(r *http.Request, creating bool) (postFormData, []s
 		errs = append(errs, "Status must be draft, published, or archived")
 	}
 	return form, errs
+}
+
+func parseFormTime(raw string) (time.Time, error) {
+	return time.Parse(time.RFC3339Nano, strings.TrimSpace(raw))
+}
+
+func formatFormTime(t time.Time) string {
+	return t.UTC().Format(time.RFC3339Nano)
 }
 
 // validateQuickEdit explains one unit of behavior in this package.

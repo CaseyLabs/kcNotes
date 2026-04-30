@@ -40,6 +40,19 @@ type Post struct {
 	DeletedAt   *time.Time
 }
 
+type AutosaveSnapshot struct {
+	PostID        string
+	AuthorID      string
+	Type          PostType
+	Title         string
+	Slug          string
+	BodyMD        string
+	Status        PostStatus
+	BaseUpdatedAt time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
 // IsValidPostType explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func IsValidPostType(t PostType) bool {

@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Date: 2026-04-24
+Date: 2026-04-30
 
 ## Purpose
 
@@ -126,6 +126,7 @@ the UI refresh.
 ### Posts and Pages
 
 - Post/page types.
+- Existing post/page edit-form autosave snapshots with restore and dismiss.
 - Status workflow:
   - `draft`;
   - `published`;
@@ -237,124 +238,25 @@ the UI refresh.
 
 ## Required Remaining Work
 
+No required feature gaps remain in the documented R1 scope.
+
 ### R1: Autosave Drafts
 
-Autosave is the only required gap identified by `FINAL-PLAN.md`. It is not
-implemented yet in the current source tree.
+Autosave is implemented for existing post/page edit forms.
 
-Current missing pieces:
-
-- No autosave database table or migration.
-- No autosave domain type.
-- No autosave store methods.
-- No autosave admin routes.
-- No autosave handlers.
-- No throttled HTMX trigger in the post/page editor.
-- No save-status UI.
-- No recovery/dismiss flow for newer autosave snapshots.
-- No autosave tests.
-- README and `AGENTS.md` still do not describe autosave as complete.
-
-#### R1.1 Data Model
-
-Add an autosave snapshot table. Recommended shape:
-
-- `id TEXT PRIMARY KEY`
-- `post_id TEXT`
-- `author_id TEXT NOT NULL`
-- `type TEXT NOT NULL`
-- `title TEXT NOT NULL`
-- `slug TEXT NOT NULL`
-- `body_md TEXT NOT NULL`
-- `status TEXT NOT NULL`
-- `base_updated_at TEXT`
-- `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
-- `updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
-
-Constraints:
-
-- Keep only the latest autosave per `(post_id, author_id)` for existing posts.
-- For unsaved drafts, either create a real draft post first or support a stable
-  client draft key. Prefer creating a real draft post if it keeps the model
-  simpler and safer.
-- Preserve author ownership rules.
-- Do not allow autosave to publish content.
-
-#### R1.2 Store API
-
-Add store methods for:
-
-- create/update latest autosave snapshot;
-- get latest autosave snapshot for a post/user;
-- dismiss autosave snapshot;
-- optionally clean stale autosave snapshots on access.
-
-Behavior:
-
-- Use retry wrappers for transient failures.
-- Treat duplicate latest-snapshot writes as update/upsert behavior.
-- Compare `base_updated_at` or equivalent revision token to detect stale editor
-  state.
-
-#### R1.3 HTTP Contract
-
-Add autosave endpoints:
-
-- `POST /admin/posts/{id}/autosave` for existing posts/pages.
-- `POST /admin/posts/autosave` for a new unsaved editor flow only if the UI
-  keeps unsaved posts before creating a real draft.
-
-Response behavior:
-
-- Auth, CSRF, rate limiting, and ownership checks match other post write routes.
-- Successful HTMX autosave returns a fragment that updates save status or
-  `#flash`.
-- Invalid payloads return `422` with a validation fragment.
-- Unauthorized/forbidden behavior follows existing middleware conventions.
-
-#### R1.4 Editor UX
-
-Update `web/templates/partials/post_form.tmpl`:
-
-- Add HTMX autosave trigger for edit forms.
-- Use a throttle/idle interval of about 3-5 seconds.
-- Show save states:
-  - `Saving...`;
-  - `Saved`;
-  - `Failed`.
-- Ensure full save/publish/unpublish remains the source of truth for canonical
-  content state.
-- Avoid autosave overwriting canonical status unexpectedly.
-
-#### R1.5 Recovery Flow
-
-On editor load:
-
-- Check whether a newer autosave snapshot exists.
-- Show a clear restore/dismiss choice.
-- Restore should populate the editor with snapshot content.
-- Dismiss should delete or mark the snapshot ignored.
-
-#### R1.6 Tests
-
-Add focused tests:
-
-- Store create/update/get/dismiss behavior.
-- Ownership restrictions.
-- Stale revision conflict behavior.
-- Handler success fragment.
-- Handler validation failure with `422`.
-- Unauthorized/forbidden paths.
-- Existing create/edit/publish/unpublish/delete flows remain stable.
-
-#### R1.7 Docs
-
-After autosave is implemented:
-
-- Update `README.md` feature list and route list.
-- Update `AGENTS.md` milestone status to remove the out-of-scope autosave note.
-- Update this implementation plan with the completion outcome. Do not reference
-  `.agent/CONTINUITY.md` unless that file is restored.
+- `autosave_snapshots` stores one private latest snapshot per `(post_id,
+  author_id)`.
+- Store methods create/update, retrieve, and dismiss snapshots through the retry
+  wrappers.
+- `POST /admin/posts/{id}/autosave` validates the edit form, checks
+  `base_updated_at`, and returns a save-status fragment without changing the
+  canonical post.
+- `POST /admin/posts/{id}/autosave/restore` repopulates the edit form from the
+  snapshot.
+- `POST /admin/posts/{id}/autosave/dismiss` removes the user's snapshot.
+- The edit form autosaves only existing posts/pages. `/admin/posts/new` still
+  creates content only through the normal manual submit path.
+- Static publishing continues to read canonical posts/pages only.
 
 ## Optional Backlog
 

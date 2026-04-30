@@ -13,7 +13,8 @@ container-driven workflows.
 - Self-hosted static assets and Tailwind CSS.
 - SQLite/libSQL storage with local, remote Turso, and optional replica modes.
 - Session auth, CSRF protection, MFA, RBAC, rate limiting, and account lockout.
-- Posts/pages, media uploads, settings, audit log, search, and static publishing.
+- Posts/pages with edit-form autosave recovery, media uploads, settings, audit
+  log, search, and static publishing.
 - Root-owned Docker, Make, GitHub Actions, security scan, dependency update,
   and release integrity workflows.
 
@@ -80,10 +81,24 @@ Maintenance commands:
 - Login: `http://localhost:5555/admin/login`
 - Dashboard: `http://localhost:5555/admin`
 - Posts: `http://localhost:5555/admin/posts`
+- Existing post/page autosave: `POST /admin/posts/{id}/autosave`
+- Autosave restore: `POST /admin/posts/{id}/autosave/restore`
+- Autosave dismiss: `POST /admin/posts/{id}/autosave/dismiss`
 - Media: `http://localhost:5555/admin/media`
 - Users: `http://localhost:5555/admin/users`
 - Settings: `http://localhost:5555/admin/settings`
 - Audit log: `http://localhost:5555/admin/audit`
+
+## Post Autosave
+
+Existing post and page edit forms autosave private recovery snapshots after
+changes settle for a few seconds. Autosave snapshots are per user and per post,
+and they do not publish content or change the canonical post until the normal
+`Save Changes` action is submitted.
+
+If a newer snapshot exists when an editor is opened, the form shows a recovery
+panel. `Restore Autosave` fills the editor with the snapshot while keeping the
+canonical save action, and `Dismiss` removes that snapshot.
 
 ## CLI Modes
 

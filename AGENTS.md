@@ -27,9 +27,8 @@ Before changing app behavior, read:
 2. `docs/IMPLEMENTATION-PLAN.md` for current implementation status and
    remaining required work.
 
-As of `docs/IMPLEMENTATION-PLAN.md` dated 2026-04-24, autosave drafts are the
-only required feature gap. Do not describe autosave as complete until the code,
-tests, and docs are updated.
+As of `docs/IMPLEMENTATION-PLAN.md` dated 2026-04-30, the required R1 autosave
+scope is implemented for existing post/page edit forms.
 
 ## Public Interface
 

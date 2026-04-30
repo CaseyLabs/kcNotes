@@ -332,6 +332,99 @@ func (s *AuthStore) UpdatePost(ctx context.Context, post domain.Post, actor doma
 	return rows > 0, nil
 }
 
+// UpsertAutosaveSnapshot stores one recoverable edit snapshot per user/post pair.
+func (s *AuthStore) UpsertAutosaveSnapshot(ctx context.Context, snapshot domain.AutosaveSnapshot, actor domain.User) (bool, error) {
+	if !domain.IsValidPostType(snapshot.Type) {
+		return false, fmt.Errorf("invalid type %q", snapshot.Type)
+	}
+	if !domain.IsValidPostStatus(snapshot.Status) || snapshot.Status == domain.PostStatusDeleted {
+		return false, fmt.Errorf("invalid status %q", snapshot.Status)
+	}
+	if snapshot.AuthorID != actor.ID {
+		return false, nil
+	}
+
+	query := `
+		INSERT INTO autosave_snapshots(post_id, author_id, type, title, slug, body_md, status, base_updated_at, created_at, updated_at)
+		SELECT id, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		FROM posts
+		WHERE id = ? AND deleted_at IS NULL AND datetime(updated_at) = datetime(?)
+	`
+	args := []any{snapshot.AuthorID, string(snapshot.Type), snapshot.Title, snapshot.Slug, snapshot.BodyMD, string(snapshot.Status), nullableTime(&snapshot.BaseUpdatedAt), snapshot.PostID, nullableTime(&snapshot.BaseUpdatedAt)}
+	if actor.Role == domain.RoleAuthor {
+		query += " AND author_id = ?"
+		args = append(args, actor.ID)
+	}
+	query += `
+		ON CONFLICT(post_id, author_id) DO UPDATE SET
+			type = excluded.type,
+			title = excluded.title,
+			slug = excluded.slug,
+			body_md = excluded.body_md,
+			status = excluded.status,
+			base_updated_at = excluded.base_updated_at,
+			updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+	`
+
+	var res sql.Result
+	err := s.retry.ExecRetry(ctx, func() error {
+		var err error
+		res, err = s.db.ExecContext(ctx, query, args...)
+		return err
+	})
+	if err != nil {
+		return false, fmt.Errorf("upsert autosave snapshot: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("upsert autosave snapshot rows: %w", err)
+	}
+	return rows > 0, nil
+}
+
+// GetLatestAutosaveSnapshot loads the user's latest recoverable snapshot.
+func (s *AuthStore) GetLatestAutosaveSnapshot(ctx context.Context, postID, authorID string) (domain.AutosaveSnapshot, error) {
+	var snapshot domain.AutosaveSnapshot
+	err := s.retry.QueryRetry(ctx, func() error {
+		row := s.db.QueryRowContext(ctx, `
+			SELECT post_id, author_id, type, title, slug, body_md, status, base_updated_at, created_at, updated_at
+			FROM autosave_snapshots
+			WHERE post_id = ? AND author_id = ?
+		`, postID, authorID)
+		got, err := scanAutosaveSnapshot(row)
+		if err != nil {
+			return err
+		}
+		snapshot = got
+		return nil
+	})
+	if err != nil {
+		return domain.AutosaveSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+// DismissAutosaveSnapshot deletes only the actor's private recovery snapshot.
+func (s *AuthStore) DismissAutosaveSnapshot(ctx context.Context, postID, authorID string) (bool, error) {
+	var res sql.Result
+	err := s.retry.ExecRetry(ctx, func() error {
+		var err error
+		res, err = s.db.ExecContext(ctx, `
+			DELETE FROM autosave_snapshots
+			WHERE post_id = ? AND author_id = ?
+		`, postID, authorID)
+		return err
+	})
+	if err != nil {
+		return false, fmt.Errorf("dismiss autosave snapshot: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("dismiss autosave snapshot rows: %w", err)
+	}
+	return rows > 0, nil
+}
+
 // SetPostStatus explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func (s *AuthStore) SetPostStatus(ctx context.Context, id string, status domain.PostStatus, publishedAt *time.Time, actor domain.User) (bool, error) {
@@ -554,6 +647,53 @@ func scanPost(scanner interface{ Scan(dest ...any) error }) (domain.Post, error)
 	}
 
 	return post, nil
+}
+
+func scanAutosaveSnapshot(scanner interface{ Scan(dest ...any) error }) (domain.AutosaveSnapshot, error) {
+	var (
+		snapshot     domain.AutosaveSnapshot
+		postType     string
+		status       string
+		baseRaw      string
+		createdAtRaw string
+		updatedAtRaw string
+	)
+	err := scanner.Scan(
+		&snapshot.PostID,
+		&snapshot.AuthorID,
+		&postType,
+		&snapshot.Title,
+		&snapshot.Slug,
+		&snapshot.BodyMD,
+		&status,
+		&baseRaw,
+		&createdAtRaw,
+		&updatedAtRaw,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.AutosaveSnapshot{}, ErrNotFound
+		}
+		return domain.AutosaveSnapshot{}, fmt.Errorf("scan autosave snapshot: %w", err)
+	}
+	baseUpdatedAt, err := parseSQLiteTime(baseRaw)
+	if err != nil {
+		return domain.AutosaveSnapshot{}, fmt.Errorf("parse base_updated_at: %w", err)
+	}
+	createdAt, err := parseSQLiteTime(createdAtRaw)
+	if err != nil {
+		return domain.AutosaveSnapshot{}, fmt.Errorf("parse created_at: %w", err)
+	}
+	updatedAt, err := parseSQLiteTime(updatedAtRaw)
+	if err != nil {
+		return domain.AutosaveSnapshot{}, fmt.Errorf("parse updated_at: %w", err)
+	}
+	snapshot.Type = domain.PostType(postType)
+	snapshot.Status = domain.PostStatus(status)
+	snapshot.BaseUpdatedAt = baseUpdatedAt
+	snapshot.CreatedAt = createdAt
+	snapshot.UpdatedAt = updatedAt
+	return snapshot, nil
 }
 
 // parseSQLiteTime explains one unit of behavior in this package.
