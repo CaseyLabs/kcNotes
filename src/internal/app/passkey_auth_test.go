@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"kcnotes/internal/domain"
 	"kcnotes/internal/store/sqlite"
 )
 
@@ -28,8 +29,9 @@ func TestPasskeyOnlySetupRoutes(t *testing.T) {
 		t.Fatalf("expected setup page to describe passkey setup")
 	}
 
-	if err := application.CreateUser(context.Background(), "pending@example.com", "editor"); err != nil {
-		t.Fatalf("create disabled placeholder: %v", err)
+	store := sqlite.NewAuthStore(application.db)
+	if err := store.CreateUser(context.Background(), testUser("pending@example.com")); err != nil {
+		t.Fatalf("create existing user: %v", err)
 	}
 
 	res = httptest.NewRecorder()
@@ -76,26 +78,6 @@ func TestMFARouteUnavailable(t *testing.T) {
 	}
 }
 
-func TestCreateUserCreatesDisabledPlaceholder(t *testing.T) {
-	application := newTestApp(t)
-
-	if err := application.CreateUser(context.Background(), "placeholder@example.com", "author"); err != nil {
-		t.Fatalf("create user placeholder: %v", err)
-	}
-
-	store := sqlite.NewAuthStore(application.db)
-	user, err := store.GetUserByEmail(context.Background(), "placeholder@example.com")
-	if err != nil {
-		t.Fatalf("load placeholder user: %v", err)
-	}
-	if !user.Disabled {
-		t.Fatal("expected create-user placeholder to be disabled")
-	}
-	if user.PasswordHash != "" {
-		t.Fatal("expected create-user placeholder to have no password hash")
-	}
-}
-
 func newTestApp(t *testing.T) *App {
 	t.Helper()
 	t.Chdir(filepath.Join("..", ".."))
@@ -139,4 +121,12 @@ func findCookie(t *testing.T, cookies []*http.Cookie, name string) *http.Cookie 
 	}
 	t.Fatalf("missing cookie %s", name)
 	return nil
+}
+
+func testUser(email string) domain.User {
+	return domain.User{
+		ID:    strings.ReplaceAll(email, "@", "-"),
+		Email: email,
+		Role:  domain.RoleEditor,
+	}
 }

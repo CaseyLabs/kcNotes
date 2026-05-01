@@ -54,7 +54,6 @@ Application targets:
 make css
 make lint
 make migrate
-make create-user
 make publish
 make preview
 make smoke

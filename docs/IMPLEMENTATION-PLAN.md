@@ -51,7 +51,6 @@ the UI refresh.
   - `make test`
   - `make lint`
   - `make migrate`
-  - `make create-user`
   - `make publish`
   - `make preview`
   - `make run`
@@ -87,12 +86,13 @@ the UI refresh.
 
 ### Authentication and Authorization
 
-- Passkey-only session-based login/logout using WebAuthn.
+- Passkey-only session-based login/logout using WebAuthn with required user
+  verification.
 - Secure cookie attributes including `HttpOnly`, `SameSite=Lax`, configurable
   `Secure`, and configurable admin cookie path.
 - First-admin browser setup at `/admin/setup`, available only while the users
   table is empty.
-- Discoverable passkey login at `/admin/login`.
+- Discoverable passkey login at `/admin/login` with required user verification.
 - User onboarding through single-use, expiring enrollment invitations instead
   of passwords.
 - Authenticated passkey management at `/admin/passkeys`, with a guard that
@@ -100,8 +100,6 @@ the UI refresh.
 - WebAuthn credential, challenge, and enrollment-invitation persistence.
 - Password login, password reset, TOTP, recovery-code login, and `/admin/mfa`
   are intentionally not routed or documented as active workflows.
-- `make create-user` creates a disabled placeholder account only; it does not
-  create a password or passkey credential.
 - RBAC roles:
   - `admin`;
   - `editor`;
@@ -278,7 +276,7 @@ Passkey-only admin authentication is the active baseline.
 - Legacy `POST /admin/login` requests are rejected with a passkey-only message.
 - `/admin/mfa` is unavailable.
 - Password, TOTP, and recovery-code handler/template/test code has been removed
-  while existing database columns and migrations remain for compatibility.
+  from active workflows.
 - First-admin setup is available only on an empty users table.
 - Enrollment invitations are single-use and expire.
 - Disabled users are rejected by session loading and passkey credential lookup

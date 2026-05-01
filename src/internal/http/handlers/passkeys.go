@@ -41,7 +41,7 @@ func (h *Admin) SetupRegistrationStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user := domain.User{ID: userID, Email: email, Role: domain.RoleAdmin}
-	creation, session, err := h.webAuthn.BeginRegistration(auth.WebAuthnUser{User: user}, webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementRequired))
+	creation, session, err := h.webAuthn.BeginRegistration(auth.WebAuthnUser{User: user}, passkeyRegistrationOptions()...)
 	if err != nil {
 		h.logger.Warn("start first-admin passkey registration", "error", err)
 		writeJSONError(w, http.StatusServiceUnavailable, "setup is unavailable")
@@ -235,7 +235,7 @@ func (h *Admin) startRegistrationForUser(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	nickname := strings.TrimSpace(r.FormValue("nickname"))
-	creation, session, err := h.webAuthn.BeginRegistration(auth.WebAuthnUser{User: user, Credential: webAuthnCredentials}, webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementRequired))
+	creation, session, err := h.webAuthn.BeginRegistration(auth.WebAuthnUser{User: user, Credential: webAuthnCredentials}, passkeyRegistrationOptions()...)
 	if err != nil {
 		h.logger.Warn("start passkey registration", "error", err, "user_id", user.ID, "challenge_type", challengeType)
 		writeJSONError(w, http.StatusServiceUnavailable, "passkey registration is unavailable")
@@ -326,6 +326,22 @@ func passkeyChallengeExpiresAt(session *webauthn.SessionData) time.Time {
 		return session.Expires
 	}
 	return time.Now().UTC().Add(passkeyChallengeTTL)
+}
+
+func passkeyRegistrationOptions() []webauthn.RegistrationOption {
+	return []webauthn.RegistrationOption{
+		webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{
+			RequireResidentKey: protocol.ResidentKeyRequired(),
+			ResidentKey:        protocol.ResidentKeyRequirementRequired,
+			UserVerification:   protocol.VerificationRequired,
+		}),
+	}
+}
+
+func passkeyLoginOptions() []webauthn.LoginOption {
+	return []webauthn.LoginOption{
+		webauthn.WithUserVerification(protocol.VerificationRequired),
+	}
 }
 
 func (h *Admin) consumeChallenge(w http.ResponseWriter, r *http.Request, id, challengeType string) (domain.WebAuthnChallenge, webauthn.SessionData, bool) {

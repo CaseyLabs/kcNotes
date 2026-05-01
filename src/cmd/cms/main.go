@@ -29,9 +29,7 @@ func main() {
 	cfg := app.LoadConfig()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	mode := flag.String("mode", "serve", "mode: serve|migrate|create-user|publish|preview")
-	userEmail := flag.String("email", "", "email for create-user mode")
-	userRole := flag.String("role", "admin", "role for create-user mode: admin|editor|author")
+	mode := flag.String("mode", "serve", "mode: serve|migrate|publish|preview")
 	flag.Parse()
 
 	application, err := app.New(cfg, logger)
@@ -48,16 +46,6 @@ func main() {
 			os.Exit(1)
 		}
 		logger.Info("migrations applied")
-	case "create-user":
-		if *userEmail == "" {
-			logger.Error("email is required for create-user mode")
-			os.Exit(1)
-		}
-		if err := application.CreateUser(context.Background(), *userEmail, *userRole); err != nil {
-			logger.Error("create user", "error", err)
-			os.Exit(1)
-		}
-		logger.Info("disabled user placeholder created; finish enrollment through an admin-issued passkey invitation or /admin/setup when the database is empty", "email", *userEmail, "role", *userRole)
 	case "serve":
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()

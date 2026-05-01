@@ -89,8 +89,6 @@ run_in_dev_container() {
 		-e WEBAUTHN_RP_ID \
 		-e WEBAUTHN_RP_NAME \
 		-e WEBAUTHN_ORIGINS \
-		-e EMAIL \
-		-e ROLE \
 		-v "${docker_home_source}:${docker_home}" \
 		-v "${docker_tmpdir}:/tmp" \
 		-v "$(pwd):/workspace" \
@@ -172,6 +170,9 @@ run_web_container() {
 		-e PUBLISH_OUT_DIR \
 		-e PUBLISH_INCLUDE_DRAFTS \
 		-e PREVIEW_HTTP_ADDR \
+		-e WEBAUTHN_RP_ID \
+		-e WEBAUTHN_RP_NAME \
+		-e WEBAUTHN_ORIGINS \
 		-v "${docker_home_source}:${docker_home}" \
 		-v "${docker_tmpdir}:/tmp" \
 		-v "$(pwd):/workspace" \

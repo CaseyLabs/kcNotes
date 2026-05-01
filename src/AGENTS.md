@@ -42,7 +42,6 @@ make lint
 make build
 make test
 make migrate
-make create-user
 make publish
 make preview
 make run

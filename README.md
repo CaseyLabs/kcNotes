@@ -50,9 +50,6 @@ Core app commands:
 - `make css`: builds Tailwind CSS.
 - `make lint`: runs format and lint checks.
 - `make migrate`: applies database migrations.
-- `make create-user`: creates a disabled user placeholder from `EMAIL` and
-  `ROLE`; it does not create a password or passkey credential. Normal user
-  onboarding uses an admin-issued passkey enrollment link.
 - `make run`: applies pending migrations, then starts the CMS.
 - `make publish`: writes the static site to `dist/site` unless
   `PUBLISH_OUT_DIR` is set.
@@ -112,8 +109,6 @@ The root Make targets run these modes in the project container:
 
 - `go run ./cmd/cms -mode serve`
 - `go run ./cmd/cms -mode migrate`
-- `go run ./cmd/cms -mode create-user -email admin@example.com`
-  `-role admin`
 - `go run ./cmd/cms -mode publish`
 - `go run ./cmd/cms -mode preview`
 
@@ -121,7 +116,8 @@ The root Make targets run these modes in the project container:
 
 kcNotes admin access is passkey-only. Password login, password reset, TOTP,
 recovery-code login, and `/admin/mfa` are not part of the active
-authentication flow.
+authentication flow. Passkey setup, enrollment, and sign-in require WebAuthn
+user verification, such as a device PIN or biometric check.
 
 For a new database, run migrations and start the app, then open
 `/admin/setup`. That route is available only while the users table is empty. A
@@ -130,8 +126,7 @@ credential, and starts an admin session.
 
 After setup, admins invite users from `/admin/users`. Each invitation creates a
 single-use, expiring enrollment link for `/admin/enroll`; the invited user must
-complete browser passkey enrollment before signing in. `make create-user`
-remains a compatibility helper for creating a disabled placeholder account only.
+complete browser passkey enrollment before signing in.
 
 Browsers require a secure WebAuthn context. Local development works on
 `localhost`; the dev default allows ports `5555` through `5565` plus `8080`. If

@@ -12,9 +12,7 @@ package app
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"time"
@@ -93,29 +91,6 @@ func (a *App) Migrate(ctx context.Context) error {
 	return storesqlite.RunMigrations(ctx, a.db)
 }
 
-// CreateUser explains one unit of behavior in this package.
-// In Go, functions often return early on errors to keep the success path simple.
-func (a *App) CreateUser(ctx context.Context, email, role string) error {
-	r := domain.Role(role)
-	if !domain.IsValidRole(r) {
-		return fmt.Errorf("invalid role %q", role)
-	}
-
-	userID, err := randomID()
-	if err != nil {
-		return fmt.Errorf("generate user id: %w", err)
-	}
-
-	store := storesqlite.NewAuthStore(a.db)
-	return store.CreateUser(ctx, domain.User{
-		ID:           userID,
-		Email:        email,
-		PasswordHash: "",
-		Role:         r,
-		Disabled:     true,
-	})
-}
-
 // Publish explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func (a *App) Publish(ctx context.Context) (publish.Result, error) {
@@ -186,14 +161,4 @@ func (a *App) Router() *routes.Router {
 	}
 
 	return routes.New(publicHandlers, adminHandlers, a.cfg.StaticDir, mw)
-}
-
-// randomID explains one unit of behavior in this package.
-// In Go, functions often return early on errors to keep the success path simple.
-func randomID() (string, error) {
-	buf := make([]byte, 16)
-	if _, err := rand.Read(buf); err != nil {
-		return "", fmt.Errorf("read random bytes: %w", err)
-	}
-	return hex.EncodeToString(buf), nil
 }

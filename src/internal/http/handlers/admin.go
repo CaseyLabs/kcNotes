@@ -188,7 +188,7 @@ func (h *Admin) PasskeyLoginStart(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusServiceUnavailable, "passkey login is not configured")
 		return
 	}
-	assertion, session, err := h.webAuthn.BeginDiscoverableLogin()
+	assertion, session, err := h.webAuthn.BeginDiscoverableLogin(passkeyLoginOptions()...)
 	if err != nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "passkey login is unavailable")
 		return
