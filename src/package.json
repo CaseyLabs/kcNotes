@@ -7,9 +7,9 @@
     "watch:css": "tailwindcss -i ./web/static/src/input.css -o ./web/static/css/app.css --watch"
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.2.2",
+    "@tailwindcss/cli": "^4.2.4",
     "autoprefixer": "^10.5.0",
-    "htmx.org": "2.0.9",
+    "htmx.org": "2.0.10",
     "postcss": "^8.5.10",
     "tailwindcss": "^4.1.18"
   }
