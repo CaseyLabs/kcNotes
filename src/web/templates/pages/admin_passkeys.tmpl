@@ -1,0 +1,60 @@
+{{ define "admin-passkeys" }}
+  {{ template "shell-start" . }}
+  <main class="space-y-6">
+    {{ template "partial-admin-nav" . }}
+    <section class="page-heading">
+      <div>
+        <h2 class="page-title">Passkeys</h2>
+        <p class="page-lede">Manage passkeys for {{ .UserEmail }}.</p>
+      </div>
+    </section>
+
+    {{ if .FlashMessage }}<div class="flash-success">{{ .FlashMessage }}</div>{{ end }}
+
+    <form class="panel max-w-xl space-y-4" data-passkey-add>
+      <label class="block text-sm muted">
+        Passkey Name
+        <input class="input focus-ring" type="text" name="nickname" value="Additional passkey" required />
+      </label>
+      <button class="btn btn-primary focus-ring" type="submit">Add Passkey</button>
+    </form>
+
+    <section class="table-wrap">
+      <table class="data-table min-w-[760px] divide-y divide-slate-200">
+        <thead class="table-header">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium">Name</th>
+            <th class="px-4 py-3 text-left font-medium">Backed Up</th>
+            <th class="px-4 py-3 text-left font-medium">Last Used</th>
+            <th class="px-4 py-3 text-left font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {{ range .Passkeys }}
+          <tr>
+            <td class="px-4 py-3 text-slate-900">{{ if .Nickname }}{{ .Nickname }}{{ else }}Passkey{{ end }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ if .BackupState }}yes{{ else }}no{{ end }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ if .LastUsedAt }}{{ .LastUsedAt }}{{ else }}never{{ end }}</td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-2">
+                <form class="flex gap-2" method="post" action="/admin/passkeys/{{ .ID }}/rename">
+                  <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}" />
+                  <input class="input input-inline focus-ring" type="text" name="nickname" value="{{ .Nickname }}" />
+                  <button class="btn btn-secondary btn-xs focus-ring" type="submit">Rename</button>
+                </form>
+                <form method="post" action="/admin/passkeys/{{ .ID }}/delete">
+                  <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}" />
+                  <button class="btn btn-danger btn-xs focus-ring" type="submit">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {{ else }}
+          <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">No passkeys found.</td></tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </section>
+  </main>
+  {{ template "shell-end" . }}
+{{ end }}

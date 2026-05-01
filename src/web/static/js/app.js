@@ -52,6 +52,265 @@ document.body.addEventListener("htmx:configRequest", function (event) {
   event.detail.headers["X-CSRF-Token"] = token;
 });
 
+function csrfToken() {
+  var meta = document.querySelector('meta[name="csrf-token"]');
+  if (!meta) {
+    return "";
+  }
+  return meta.getAttribute("content") || "";
+}
+
+function base64URLToBuffer(value) {
+  var base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  while (base64.length % 4) {
+    base64 += "=";
+  }
+  var binary = atob(base64);
+  var bytes = new Uint8Array(binary.length);
+  for (var i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+function bufferToBase64URL(value) {
+  var bytes = new Uint8Array(value);
+  var binary = "";
+  for (var i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function prepareCreationOptions(options) {
+  options.challenge = base64URLToBuffer(options.challenge);
+  options.user.id = base64URLToBuffer(options.user.id);
+  if (options.excludeCredentials) {
+    options.excludeCredentials.forEach(function (credential) {
+      credential.id = base64URLToBuffer(credential.id);
+    });
+  }
+  return options;
+}
+
+function prepareRequestOptions(options) {
+  options.challenge = base64URLToBuffer(options.challenge);
+  if (options.allowCredentials) {
+    options.allowCredentials.forEach(function (credential) {
+      credential.id = base64URLToBuffer(credential.id);
+    });
+  }
+  return options;
+}
+
+function credentialToJSON(credential) {
+  var response = credential.response;
+  var json = {
+    id: credential.id,
+    rawId: bufferToBase64URL(credential.rawId),
+    type: credential.type,
+    response: {}
+  };
+  if (response.clientDataJSON) {
+    json.response.clientDataJSON = bufferToBase64URL(response.clientDataJSON);
+  }
+  if (response.attestationObject) {
+    json.response.attestationObject = bufferToBase64URL(
+      response.attestationObject
+    );
+  }
+  if (response.authenticatorData) {
+    json.response.authenticatorData = bufferToBase64URL(
+      response.authenticatorData
+    );
+  }
+  if (response.signature) {
+    json.response.signature = bufferToBase64URL(response.signature);
+  }
+  if (response.userHandle) {
+    json.response.userHandle = bufferToBase64URL(response.userHandle);
+  }
+  if (typeof response.getTransports === "function") {
+    json.response.transports = response.getTransports();
+  }
+  if (credential.authenticatorAttachment) {
+    json.authenticatorAttachment = credential.authenticatorAttachment;
+  }
+  return json;
+}
+
+function postForm(url, formData) {
+  return fetch(url, {
+    method: "POST",
+    headers: { "X-CSRF-Token": csrfToken() },
+    body: formData || new FormData()
+  }).then(function (response) {
+    return response.json().then(function (data) {
+      if (!response.ok) {
+        throw new Error(data.error || "Passkey request failed");
+      }
+      return data;
+    });
+  });
+}
+
+function postCredential(url, credential) {
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": csrfToken()
+    },
+    body: JSON.stringify(credentialToJSON(credential))
+  }).then(function (response) {
+    return response.json().then(function (data) {
+      if (!response.ok) {
+        throw new Error(data.error || "Passkey request failed");
+      }
+      return data;
+    });
+  });
+}
+
+function redirectFrom(data, fallback) {
+  window.location.href = data.redirect || fallback;
+}
+
+function showPasskeyError(message) {
+  var flash = document.querySelector("#flash");
+  if (flash) {
+    flash.className = "flash-error mb-4";
+    flash.textContent = message;
+  } else {
+    alert(message);
+  }
+}
+
+function passkeysAvailable() {
+  return !!(window.PublicKeyCredential && navigator.credentials);
+}
+
+function setBusy(control, busy) {
+  if (!control) {
+    return;
+  }
+  control.disabled = busy;
+  control.setAttribute("aria-busy", busy ? "true" : "false");
+}
+
+function bindPasskeyLogin() {
+  var button = document.querySelector("[data-passkey-login]");
+  if (!button) {
+    return;
+  }
+  button.addEventListener("click", function () {
+    if (!passkeysAvailable()) {
+      showPasskeyError(
+        "Passkeys require a compatible browser on HTTPS or localhost."
+      );
+      return;
+    }
+    setBusy(button, true);
+    postForm("/admin/login/passkeys/start")
+      .then(function (data) {
+        return navigator.credentials
+          .get({ publicKey: prepareRequestOptions(data.publicKey) })
+          .then(function (credential) {
+            return postCredential(
+              "/admin/login/passkeys/finish?challenge_id=" +
+                encodeURIComponent(data.challenge_id),
+              credential
+            );
+          });
+      })
+      .then(function (data) {
+        redirectFrom(data, "/admin");
+      })
+      .catch(function (error) {
+        showPasskeyError(error.message);
+      })
+      .finally(function () {
+        setBusy(button, false);
+      });
+  });
+}
+
+function bindPasskeyRegistration(selector, startURL, finishURL, fallback) {
+  var form = document.querySelector(selector);
+  if (!form) {
+    return;
+  }
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    if (!passkeysAvailable()) {
+      showPasskeyError(
+        "Passkeys require a compatible browser on HTTPS or localhost."
+      );
+      return;
+    }
+    var submitButton = form.querySelector('button[type="submit"]');
+    setBusy(submitButton, true);
+    var formData = new FormData(form);
+    postForm(startURL, formData)
+      .then(function (data) {
+        return navigator.credentials
+          .create({ publicKey: prepareCreationOptions(data.publicKey) })
+          .then(function (credential) {
+            var url =
+              finishURL +
+              "?challenge_id=" +
+              encodeURIComponent(data.challenge_id);
+            if (data.user_id) {
+              url +=
+                "&user_id=" +
+                encodeURIComponent(data.user_id) +
+                "&email=" +
+                encodeURIComponent(data.email || "") +
+                "&nickname=" +
+                encodeURIComponent(data.nickname || "");
+            }
+            var token = formData.get("token");
+            if (token) {
+              url += "&token=" + encodeURIComponent(token);
+            }
+            return postCredential(url, credential);
+          });
+      })
+      .then(function (data) {
+        redirectFrom(data, fallback);
+      })
+      .catch(function (error) {
+        showPasskeyError(error.message);
+      })
+      .finally(function () {
+        setBusy(submitButton, false);
+      });
+  });
+}
+
+bindPasskeyLogin();
+bindPasskeyRegistration(
+  "[data-passkey-setup]",
+  "/admin/setup/passkeys/start",
+  "/admin/setup/passkeys/finish",
+  "/admin"
+);
+bindPasskeyRegistration(
+  "[data-passkey-enroll]",
+  "/admin/enroll/passkeys/start",
+  "/admin/enroll/passkeys/finish",
+  "/admin"
+);
+bindPasskeyRegistration(
+  "[data-passkey-add]",
+  "/admin/passkeys/start",
+  "/admin/passkeys/finish",
+  "/admin/passkeys"
+);
+
 /*
   THEME MANAGEMENT OVERVIEW:
   - The default mode is "system", which means CSS `prefers-color-scheme` decides.

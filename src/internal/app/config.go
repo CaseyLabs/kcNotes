@@ -45,6 +45,9 @@ type Config struct {
 	LoginLockoutThreshold int
 	LoginLockoutWindow    time.Duration
 	LoginLockoutDuration  time.Duration
+	WebAuthnRPID          string
+	WebAuthnRPName        string
+	WebAuthnOrigins       []string
 }
 
 // LoadConfig explains one unit of behavior in this package.
@@ -79,6 +82,9 @@ func LoadConfig() Config {
 		LoginLockoutThreshold: getIntEnv("LOGIN_LOCKOUT_THRESHOLD", 8),
 		LoginLockoutWindow:    getDurationEnv("LOGIN_LOCKOUT_WINDOW", 15*time.Minute),
 		LoginLockoutDuration:  getDurationEnv("LOGIN_LOCKOUT_DURATION", 15*time.Minute),
+		WebAuthnRPID:          getEnv("WEBAUTHN_RP_ID", ""),
+		WebAuthnRPName:        getEnv("WEBAUTHN_RP_NAME", "kcNotes"),
+		WebAuthnOrigins:       getListEnv("WEBAUTHN_ORIGINS"),
 	}
 	return cfg
 }

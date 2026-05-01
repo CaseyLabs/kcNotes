@@ -29,7 +29,7 @@ lint: ## runs kcNotes linters and format checks
 migrate: ## runs kcNotes database migrations
 	sh scripts/migrate.sh "$(PROJECT_CFG_FILE)"
 
-create-user: ## creates a kcNotes user; set EMAIL, PASSWORD, and ROLE
+create-user: ## creates a disabled kcNotes user placeholder; set EMAIL and ROLE
 	sh scripts/create-user.sh "$(PROJECT_CFG_FILE)"
 
 publish: ## publishes the static kcNotes site

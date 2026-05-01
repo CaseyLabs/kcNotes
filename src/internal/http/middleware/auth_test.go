@@ -114,6 +114,31 @@ func TestSessionLoaderHandlesMissingSession(t *testing.T) {
 	}
 }
 
+func TestSessionLoaderRejectsDisabledUser(t *testing.T) {
+	store := &fakeSessionStore{session: domain.SessionUser{
+		SessionID: "s-disabled",
+		ExpiresAt: time.Now().UTC().Add(1 * time.Hour),
+		User:      domain.User{ID: "u-disabled", Email: "disabled@example.com", Role: domain.RoleAdmin, Disabled: true},
+	}}
+	h := SessionLoader(store, SessionConfig{CookieName: "cms_session", CookiePath: "/admin"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := CurrentUser(r); ok {
+			t.Fatal("expected disabled user to be removed from context")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/admin", nil)
+	req.AddCookie(&http.Cookie{Name: "cms_session", Value: "s-disabled"})
+	res := httptest.NewRecorder()
+	h.ServeHTTP(res, req)
+	if res.Code != http.StatusNoContent {
+		t.Fatalf("status = %d", res.Code)
+	}
+	if len(res.Result().Cookies()) == 0 {
+		t.Fatal("expected cookie clear")
+	}
+}
+
 // TestSessionLoaderInternalError explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func TestSessionLoaderInternalError(t *testing.T) {

@@ -11,7 +11,9 @@ details so local use and GitHub Actions share the same behavior.
 - `make css`: builds the Tailwind CSS bundle.
 - `make lint`: runs format and lint checks.
 - `make migrate`: applies database migrations.
-- `make create-user`: creates a user from `EMAIL`, `PASSWORD`, and `ROLE`.
+- `make create-user`: creates a disabled user placeholder from `EMAIL` and
+  `ROLE`; it does not create a password or passkey credential. Browser passkey
+  enrollment through `/admin/enroll` is still required before sign-in.
 - `make run`: starts the CMS container, building first when needed.
 - `make stop`: stops managed kcNotes containers.
 - `make status`: shows local image and container state.

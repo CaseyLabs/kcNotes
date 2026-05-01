@@ -13,26 +13,12 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
   {{ template "shell-start" . }}
   <main class="panel mx-auto max-w-md">
     <h2 class="page-title">Admin Login</h2>
-    <p class="mt-1 text-sm muted">Sign in to continue.</p>
+    <p class="mt-1 text-sm muted">Sign in with a passkey.</p>
     {{ if .Error }}
       <div class="flash-error mt-4">{{ .Error }}</div>
     {{ end }}
-    <form class="mt-5 space-y-4" method="post" action="/admin/login">
-      <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
-      <label class="block text-sm muted">
-        Email
-        <input class="input focus-ring" type="email" name="email" required autocomplete="email" />
-      </label>
-      <label class="block text-sm muted">
-        Password
-        <input class="input focus-ring" type="password" name="password" required autocomplete="current-password" />
-      </label>
-      <label class="block text-sm muted">
-        Authenticator or Recovery Code
-        <input class="input focus-ring" type="text" name="otp" autocomplete="one-time-code" />
-      </label>
-      <button class="btn btn-primary focus-ring w-full" type="submit">Sign In</button>
-    </form>
+    <button class="btn btn-primary focus-ring mt-5 w-full" type="button" data-passkey-login>Sign In With Passkey</button>
+    <p class="mt-4 text-sm muted">New site? Open <a class="admin-link focus-ring" href="/admin/setup">first admin setup</a>.</p>
   </main>
   {{ template "shell-end" . }}
 {{ end }}

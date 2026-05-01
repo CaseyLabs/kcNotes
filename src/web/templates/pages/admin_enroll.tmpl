@@ -1,0 +1,16 @@
+{{ define "admin-enroll" }}
+  {{ template "shell-start" . }}
+  <main class="panel mx-auto max-w-md">
+    <h2 class="page-title">Passkey Enrollment</h2>
+    <p class="mt-1 text-sm muted">Create a passkey for {{ .Email }}.</p>
+    <form class="mt-5 space-y-4" data-passkey-enroll>
+      <input type="hidden" name="token" value="{{ .Token }}" />
+      <label class="block text-sm muted">
+        Passkey Name
+        <input class="input focus-ring" type="text" name="nickname" value="Primary passkey" required />
+      </label>
+      <button class="btn btn-primary focus-ring w-full" type="submit">Create Passkey</button>
+    </form>
+  </main>
+  {{ template "shell-end" . }}
+{{ end }}

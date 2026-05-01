@@ -20,6 +20,6 @@ module.exports = {
       Empty object `{}` means "use default options".
     */
     tailwindcss: {},
-    autoprefixer: {},
-  },
+    autoprefixer: {}
+  }
 };

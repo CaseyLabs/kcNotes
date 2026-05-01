@@ -20,7 +20,6 @@ func TestParseAndValidateCreateUserForm(t *testing.T) {
 	t.Parallel()
 	values := url.Values{}
 	values.Set("email", "Admin@Example.com")
-	values.Set("password", "very-secret")
 	values.Set("role", "admin")
 
 	r, _ := http.NewRequest(http.MethodPost, "/admin/users", strings.NewReader(values.Encode()))
@@ -44,7 +43,6 @@ func TestParseAndValidateCreateUserFormRejectsInvalid(t *testing.T) {
 	t.Parallel()
 	values := url.Values{}
 	values.Set("email", "bad")
-	values.Set("password", "short")
 	values.Set("role", "bad")
 
 	r, _ := http.NewRequest(http.MethodPost, "/admin/users", strings.NewReader(values.Encode()))

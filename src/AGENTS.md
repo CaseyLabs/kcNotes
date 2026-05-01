@@ -16,8 +16,8 @@ Do not add a `Makefile`, workflow scripts, generated `dist/`, local `data/`,
 - Read `../AGENTS.md` for repository-wide rules and skill routing.
 - Read `../docs/IMPLEMENTATION-PLAN.md` for current implementation status,
   remaining required work, and optional backlog.
-- As of `../docs/IMPLEMENTATION-PLAN.md` dated 2026-04-30, the required R1
-  autosave scope is implemented for existing post/page edit forms.
+- As of `../docs/IMPLEMENTATION-PLAN.md` dated 2026-05-01, the required
+  autosave and passkey-only authentication cleanup scopes are implemented.
 
 ## App Architecture
 
@@ -64,9 +64,13 @@ Also run `make publish` or `make preview` when static publishing changes, and
 
 ## Security Rules
 
-- Preserve session auth, secure cookie settings, CSRF middleware, HTMX CSRF
-  header injection, MFA, RBAC, author ownership checks, rate limits, and
+- Preserve passkey-only session auth, secure cookie settings, CSRF middleware,
+  HTMX CSRF header injection, RBAC, author ownership checks, rate limits, and
   self-lockout guards.
+- Keep admin onboarding limited to `/admin/setup`, `/admin/login`,
+  `/admin/enroll`, `/admin/passkeys`, and admin-issued user invitations. Do not
+  reintroduce password login, password reset, TOTP, recovery-code login, or
+  `/admin/mfa`.
 - Keep state-changing admin routes protected by auth, CSRF, authorization, and
   validation.
 - Do not allow autosave, drafts, publish/unpublish, or static publishing to
