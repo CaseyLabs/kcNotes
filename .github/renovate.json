@@ -4,7 +4,6 @@
     "config:recommended",
     ":disableDependencyDashboard"
   ],
-  "binarySource": "install",
   "enabledManagers": [
     "custom.regex"
   ],
