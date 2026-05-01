@@ -12,9 +12,7 @@ package app
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"time"
@@ -93,33 +91,6 @@ func (a *App) Migrate(ctx context.Context) error {
 	return storesqlite.RunMigrations(ctx, a.db)
 }
 
-// CreateUser explains one unit of behavior in this package.
-// In Go, functions often return early on errors to keep the success path simple.
-func (a *App) CreateUser(ctx context.Context, email, password, role string) error {
-	hashed, err := auth.HashPassword(password)
-	if err != nil {
-		return fmt.Errorf("hash password: %w", err)
-	}
-	r := domain.Role(role)
-	if !domain.IsValidRole(r) {
-		return fmt.Errorf("invalid role %q", role)
-	}
-
-	userID, err := randomID()
-	if err != nil {
-		return fmt.Errorf("generate user id: %w", err)
-	}
-
-	store := storesqlite.NewAuthStore(a.db)
-	return store.CreateUser(ctx, domain.User{
-		ID:           userID,
-		Email:        email,
-		PasswordHash: hashed,
-		Role:         r,
-		Disabled:     false,
-	})
-}
-
 // Publish explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func (a *App) Publish(ctx context.Context) (publish.Result, error) {
@@ -139,6 +110,16 @@ func (a *App) Publish(ctx context.Context) (publish.Result, error) {
 // In Go, functions often return early on errors to keep the success path simple.
 func (a *App) Router() *routes.Router {
 	authStore := storesqlite.NewAuthStore(a.db)
+	webAuthn, err := auth.NewWebAuthn(auth.WebAuthnConfig{
+		RPID:        a.cfg.WebAuthnRPID,
+		RPName:      a.cfg.WebAuthnRPName,
+		RPOrigins:   a.cfg.WebAuthnOrigins,
+		SiteBaseURL: a.cfg.SiteBaseURL,
+		AppEnv:      a.cfg.AppEnv,
+	})
+	if err != nil {
+		a.logger.Error("webauthn unavailable", "error", err)
+	}
 	markdown := content.NewMarkdownRenderer()
 	publicHandlers := handlers.NewPublic(a.renderer, authStore, markdown)
 	adminHandlers := handlers.NewAdmin(a.renderer, a.logger, authStore, handlers.AdminConfig{
@@ -153,6 +134,7 @@ func (a *App) Router() *routes.Router {
 		LoginLockoutThreshold: a.cfg.LoginLockoutThreshold,
 		LoginLockoutWindow:    a.cfg.LoginLockoutWindow,
 		LoginLockoutDuration:  a.cfg.LoginLockoutDuration,
+		WebAuthn:              webAuthn,
 	})
 
 	loginLimiter := middleware.NewFixedWindowLimiter(10, 10*time.Minute)
@@ -179,14 +161,4 @@ func (a *App) Router() *routes.Router {
 	}
 
 	return routes.New(publicHandlers, adminHandlers, a.cfg.StaticDir, mw)
-}
-
-// randomID explains one unit of behavior in this package.
-// In Go, functions often return early on errors to keep the success path simple.
-func randomID() (string, error) {
-	buf := make([]byte, 16)
-	if _, err := rand.Read(buf); err != nil {
-		return "", fmt.Errorf("read random bytes: %w", err)
-	}
-	return hex.EncodeToString(buf), nil
 }

@@ -1,0 +1,19 @@
+{{ define "admin-setup" }}
+  {{ template "shell-start" . }}
+  <main class="panel mx-auto max-w-md">
+    <h2 class="page-title">First Admin Setup</h2>
+    <p class="mt-1 text-sm muted">Create the first admin account and passkey.</p>
+    <form class="mt-5 space-y-4" data-passkey-setup>
+      <label class="block text-sm muted">
+        Email
+        <input class="input focus-ring" type="email" name="email" required autocomplete="email" />
+      </label>
+      <label class="block text-sm muted">
+        Passkey Name
+        <input class="input focus-ring" type="text" name="nickname" value="Primary passkey" required />
+      </label>
+      <button class="btn btn-primary focus-ring w-full" type="submit">Create Admin Passkey</button>
+    </form>
+  </main>
+  {{ template "shell-end" . }}
+{{ end }}

@@ -31,7 +31,7 @@ module.exports = {
     - but this is the standard place to add custom design tokens later.
   */
   theme: {
-    extend: {},
+    extend: {}
   },
 
   /*
@@ -39,5 +39,5 @@ module.exports = {
     - Add official/community plugins here.
     - Empty array means no extra Tailwind plugins are enabled right now.
   */
-  plugins: [],
+  plugins: []
 };

@@ -45,10 +45,13 @@ func CSRF(cfg CSRFConfig) func(http.Handler) http.Handler {
 				return
 			}
 
-			formToken := r.PostFormValue("_csrf")
 			headerToken := r.Header.Get("X-CSRF-Token")
 			if headerToken == "" {
 				headerToken = r.Header.Get("X-CSRFToken")
+			}
+			formToken := ""
+			if headerToken == "" {
+				formToken = r.PostFormValue("_csrf")
 			}
 			if sessionToken, ok := SessionCSRFToken(r); ok {
 				if formToken != sessionToken && headerToken != sessionToken {

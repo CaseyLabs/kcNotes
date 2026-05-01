@@ -34,6 +34,42 @@ type User struct {
 	MFASecret    string
 }
 
+type PasskeyCredential struct {
+	ID                 string
+	UserID             string
+	CredentialID       []byte
+	PublicKey          []byte
+	AttestationType    string
+	Transports         []string
+	BackupEligible     bool
+	BackupState        bool
+	SignCount          uint32
+	Nickname           string
+	WebAuthnCredential []byte
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	LastUsedAt         *time.Time
+}
+
+type WebAuthnChallenge struct {
+	ID        string
+	UserID    string
+	Type      string
+	Session   []byte
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+}
+
+type EnrollmentInvitation struct {
+	ID        string
+	UserID    string
+	TokenHash string
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	CreatedBy string
+	CreatedAt time.Time
+}
+
 type SessionUser struct {
 	SessionID string
 	CSRFToken string

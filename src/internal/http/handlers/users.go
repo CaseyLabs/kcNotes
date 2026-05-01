@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"kcnotes/internal/auth"
 	"kcnotes/internal/domain"
@@ -22,9 +23,8 @@ import (
 )
 
 type userCreateForm struct {
-	Email    string
-	Password string
-	Role     domain.Role
+	Email string
+	Role  domain.Role
 }
 
 // Users explains one unit of behavior in this package.
@@ -84,22 +84,33 @@ func (h *Admin) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := auth.HashPassword(form.Password)
-	if err != nil {
-		h.renderError(w, r, http.StatusInternalServerError, "failed to hash password")
-		return
-	}
 	newUserID, err := randomID()
 	if err != nil {
 		h.renderError(w, r, http.StatusServiceUnavailable, "service unavailable")
 		return
 	}
-	err = h.store.CreateUser(r.Context(), domain.User{
+	token, err := newEnrollmentToken()
+	if err != nil {
+		h.renderError(w, r, http.StatusServiceUnavailable, "service unavailable")
+		return
+	}
+	inviteID, err := randomID()
+	if err != nil {
+		h.renderError(w, r, http.StatusServiceUnavailable, "service unavailable")
+		return
+	}
+	err = h.store.CreateEnrollmentInvitation(r.Context(), domain.User{
 		ID:           newUserID,
 		Email:        form.Email,
-		PasswordHash: hash,
+		PasswordHash: "",
 		Role:         form.Role,
-		Disabled:     false,
+		Disabled:     true,
+	}, domain.EnrollmentInvitation{
+		ID:        inviteID,
+		UserID:    newUserID,
+		TokenHash: authTokenHash(token),
+		ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour),
+		CreatedBy: currentUser.ID,
 	})
 	if err != nil {
 		if err == storesqlite.ErrConflict {
@@ -109,9 +120,10 @@ func (h *Admin) CreateUser(w http.ResponseWriter, r *http.Request) {
 		h.renderError(w, r, http.StatusInternalServerError, "failed to create user")
 		return
 	}
-	h.auditEvent(r, currentUser.ID, "user_create", "user", newUserID)
+	h.auditEvent(r, currentUser.ID, "user_invite", "user", newUserID)
 
-	h.renderUsersTableAfterAction(w, r, currentUser, "User created")
+	enrollPath := "/admin/enroll?token=" + url.QueryEscape(token)
+	h.renderUsersTableAfterAction(w, r, currentUser, "Enrollment link: "+enrollPath)
 }
 
 // UpdateUser explains one unit of behavior in this package.
@@ -218,19 +230,19 @@ func (h *Admin) renderUsersTableAfterAction(w http.ResponseWriter, r *http.Reque
 // In Go, functions often return early on errors to keep the success path simple.
 func parseAndValidateCreateUserForm(r *http.Request) (userCreateForm, []string) {
 	form := userCreateForm{
-		Email:    strings.ToLower(strings.TrimSpace(r.FormValue("email"))),
-		Password: r.FormValue("password"),
-		Role:     domain.Role(strings.TrimSpace(r.FormValue("role"))),
+		Email: strings.ToLower(strings.TrimSpace(r.FormValue("email"))),
+		Role:  domain.Role(strings.TrimSpace(r.FormValue("role"))),
 	}
-	errs := make([]string, 0, 3)
+	errs := make([]string, 0, 2)
 	if form.Email == "" || len(form.Email) > 254 || !strings.Contains(form.Email, "@") {
 		errs = append(errs, "Email is required and must be valid")
-	}
-	if len(form.Password) < 8 {
-		errs = append(errs, "Password must be at least 8 characters")
 	}
 	if !domain.IsValidRole(form.Role) {
 		errs = append(errs, "Role must be admin, editor, or author")
 	}
 	return form, errs
+}
+
+func authTokenHash(token string) string {
+	return auth.TokenHash(token)
 }

@@ -1,6 +1,6 @@
 # Implementation Plan
 
-Date: 2026-04-30
+Date: 2026-05-01
 
 ## Purpose
 
@@ -51,7 +51,6 @@ the UI refresh.
   - `make test`
   - `make lint`
   - `make migrate`
-  - `make create-user`
   - `make publish`
   - `make preview`
   - `make run`
@@ -78,7 +77,7 @@ the UI refresh.
   - users;
   - settings;
   - audit log;
-  - MFA setup/enable/disable/recovery-code regeneration.
+  - passkey setup, sign-in, enrollment, and passkey management.
 - HTMX-aware table/form partials.
 - Standard partial targets exist for `#flash`, `#modal`, `#posts-table`, and
   row-level post swaps.
@@ -87,10 +86,20 @@ the UI refresh.
 
 ### Authentication and Authorization
 
-- Session-based login/logout.
+- Passkey-only session-based login/logout using WebAuthn with required user
+  verification.
 - Secure cookie attributes including `HttpOnly`, `SameSite=Lax`, configurable
   `Secure`, and configurable admin cookie path.
-- Argon2id password hashing.
+- First-admin browser setup at `/admin/setup`, available only while the users
+  table is empty.
+- Discoverable passkey login at `/admin/login` with required user verification.
+- User onboarding through single-use, expiring enrollment invitations instead
+  of passwords.
+- Authenticated passkey management at `/admin/passkeys`, with a guard that
+  keeps at least one passkey per user.
+- WebAuthn credential, challenge, and enrollment-invitation persistence.
+- Password login, password reset, TOTP, recovery-code login, and `/admin/mfa`
+  are intentionally not routed or documented as active workflows.
 - RBAC roles:
   - `admin`;
   - `editor`;
@@ -100,11 +109,8 @@ the UI refresh.
 - Admin-only user management.
 - Self-lockout guards for admin user updates.
 
-### MFA and Login Hardening
+### Login Hardening
 
-- TOTP MFA support.
-- One-time recovery codes.
-- MFA enforcement during login for MFA-enabled users.
 - Per-IP and per-account login rate limiting.
 - Per-account lockout/backoff after repeated failed authentication attempts.
 - Sensitive endpoint rate limiting.
@@ -238,7 +244,10 @@ the UI refresh.
 
 ## Required Remaining Work
 
-No required feature gaps remain in the documented R1 scope.
+No open required feature gaps remain after the R1 autosave implementation and
+the passkey-only authentication cleanup were validated. The subsections below
+record the required completion scope so future work does not confuse optional
+backlog items with blockers.
 
 ### R1: Autosave Drafts
 
@@ -258,18 +267,34 @@ Autosave is implemented for existing post/page edit forms.
   creates content only through the normal manual submit path.
 - Static publishing continues to read canonical posts/pages only.
 
+### R2: Passkey-Only Authentication Cleanup
+
+Passkey-only admin authentication is the active baseline.
+
+- Active admin auth/onboarding routes are `/admin/setup`, `/admin/login`,
+  `/admin/enroll`, `/admin/passkeys`, and admin-issued user invitations.
+- Legacy `POST /admin/login` requests are rejected with a passkey-only message.
+- `/admin/mfa` is unavailable.
+- Password, TOTP, and recovery-code handler/template/test code has been removed
+  from active workflows.
+- First-admin setup is available only on an empty users table.
+- Enrollment invitations are single-use and expire.
+- Disabled users are rejected by session loading and passkey credential lookup
+  preserves the disabled flag for login rejection.
+- Passkey challenges are single-use and expire.
+- A user cannot delete their last remaining passkey.
+
 ## Optional Backlog
 
 These items are useful, but they are not required for the current documented
 completion scope.
 
-### O1: Password Reset Flow
+### O1: Passkey Recovery and Admin UX
 
-- Password reset request endpoint.
-- Single-use, expiring reset tokens.
-- Secure password update.
-- Rate limiting.
-- Audit events for request and completion.
+- Operator recovery guidance for cases where every admin loses every passkey.
+- Cleaner enrollment-link presentation and copy action in the users UI.
+- Optional passkey attestation policy if the deployment needs hardware-key-only
+  enrollment.
 
 ### O2: Media Processing Pipeline
 
@@ -330,7 +355,13 @@ For UI-affecting changes, also manually check:
 - `/admin/users`
 - `/admin/settings`
 - `/admin/audit`
-- `/admin/mfa`
+- `/admin/passkeys`
+- `/admin/setup` on an empty database
+- `/admin/enroll` with an admin-created enrollment token
+- add, rename, and delete passkeys
+- last-passkey delete is blocked
+- `/admin/mfa` is unavailable
+- legacy password-form `POST /admin/login` cannot authenticate
 
 For publishing changes, also check:
 
@@ -352,6 +383,12 @@ Required scope is complete when:
 - Autosave does not publish content or overwrite canonical state unexpectedly.
 - Newer autosave snapshots can be restored or dismissed.
 - Autosave has store and handler regression tests.
+- Admin authentication remains passkey-only.
+- First-admin setup, passkey login, user enrollment, passkey management,
+  challenge expiry/single-use behavior, disabled-user rejection, and the
+  last-passkey delete guard have focused regression coverage.
+- Password login, password reset, TOTP, recovery-code login, and `/admin/mfa`
+  remain absent from the routed public workflow.
 - Existing required checks pass.
 - README, `AGENTS.md`, and this implementation plan accurately reflect the
   completed state.

@@ -14,6 +14,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -26,6 +27,8 @@ import (
 	"kcnotes/internal/http/middleware"
 	"kcnotes/internal/http/views"
 	storesqlite "kcnotes/internal/store/sqlite"
+
+	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 type Admin struct {
@@ -42,22 +45,27 @@ type Admin struct {
 	loginFailures   *loginFailureTracker
 	maxMediaUserB   int64
 	maxMediaTotalB  int64
+	webAuthn        *webauthn.WebAuthn
 }
 
 type adminStore interface {
-	GetUserByEmail(ctx context.Context, email string) (domain.User, error)
-	GetUserByID(ctx context.Context, id string) (domain.User, error)
-	CreateUser(ctx context.Context, user domain.User) error
+	CountUsers(ctx context.Context) (int, error)
+	CreateFirstAdminWithPasskey(ctx context.Context, user domain.User, credential domain.PasskeyCredential) error
+	CreatePasskeyCredential(ctx context.Context, credential domain.PasskeyCredential) error
+	UpdatePasskeyCredential(ctx context.Context, credential domain.PasskeyCredential) error
+	ListPasskeyCredentials(ctx context.Context, userID string) ([]domain.PasskeyCredential, error)
+	GetUserByCredentialID(ctx context.Context, credentialID []byte) (domain.User, error)
+	RenamePasskeyCredential(ctx context.Context, userID, credentialID, nickname string) (bool, error)
+	DeletePasskeyCredential(ctx context.Context, userID, credentialID string) (bool, error)
+	CreateWebAuthnChallenge(ctx context.Context, challenge domain.WebAuthnChallenge) error
+	ConsumeWebAuthnChallenge(ctx context.Context, id, challengeType string, now time.Time) (domain.WebAuthnChallenge, error)
+	CreateEnrollmentInvitation(ctx context.Context, user domain.User, invite domain.EnrollmentInvitation) error
+	GetEnrollmentInvitationByTokenHash(ctx context.Context, tokenHash string, now time.Time) (domain.EnrollmentInvitation, domain.User, error)
+	CompleteEnrollmentInvitation(ctx context.Context, inviteID string, credential domain.PasskeyCredential) error
 	ListUsers(ctx context.Context) ([]domain.User, error)
 	UpdateUserRoleDisabled(ctx context.Context, id string, role domain.Role, disabled bool) (bool, error)
 	GetSettings(ctx context.Context, keys []string) (map[string]string, error)
 	UpsertSettings(ctx context.Context, entries map[string]string) error
-	SetUserMFASecret(ctx context.Context, userID, secret string) (bool, error)
-	EnableUserMFA(ctx context.Context, userID string) (bool, error)
-	DisableUserMFA(ctx context.Context, userID string) (bool, error)
-	ReplaceRecoveryCodeHashes(ctx context.Context, userID string, hashes []string) error
-	ConsumeRecoveryCodeHash(ctx context.Context, userID, hash string) (bool, error)
-	CountUnusedRecoveryCodes(ctx context.Context, userID string) (int, error)
 	CreateSession(ctx context.Context, sessionID, userID, csrfToken string, expiresAt time.Time) error
 	DeleteSession(ctx context.Context, sessionID string) error
 	CreateAuditEvent(ctx context.Context, id, actorUserID, action, entityType, entityID, ip, userAgent string) error
@@ -89,6 +97,7 @@ type AdminConfig struct {
 	LoginLockoutThreshold int
 	LoginLockoutWindow    time.Duration
 	LoginLockoutDuration  time.Duration
+	WebAuthn              *webauthn.WebAuthn
 }
 
 // NewAdmin explains one unit of behavior in this package.
@@ -120,6 +129,7 @@ func NewAdmin(renderer *views.Renderer, logger *slog.Logger, store adminStore, c
 		loginFailures:   newLoginFailureTracker(lockoutThreshold, lockoutWindow, lockoutDuration),
 		maxMediaUserB:   cfg.MediaUserQuotaBytes,
 		maxMediaTotalB:  cfg.MediaTotalQuotaBytes,
+		webAuthn:        cfg.WebAuthn,
 	}
 }
 
@@ -153,83 +163,151 @@ func (h *Admin) LoginPage(w http.ResponseWriter, r *http.Request) {
 // Login explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func (h *Admin) Login(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		h.renderError(w, r, http.StatusBadRequest, "invalid form")
-		return
-	}
-	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
-	password := r.FormValue("password")
-	loginKey := loginFailureKey(email)
-	if h.loginFailures.IsLocked(loginKey) {
-		h.auditFailedLogin(r, email, "")
-		h.renderLoginError(w, r, "Invalid email or password")
-		return
-	}
+	h.renderLoginError(w, r, "Use your passkey to sign in")
+}
 
-	user, err := h.store.GetUserByEmail(r.Context(), email)
+func (h *Admin) SetupPage(w http.ResponseWriter, r *http.Request) {
+	count, err := h.store.CountUsers(r.Context())
+	if err != nil {
+		h.renderError(w, r, http.StatusInternalServerError, "failed to load setup")
+		return
+	}
+	if count != 0 {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = h.renderer.Render(w, "admin-setup", map[string]any{
+		"Title":     "First Admin Setup",
+		"CSRFToken": middleware.CSRFToken(r),
+	})
+}
+
+func (h *Admin) PasskeyLoginStart(w http.ResponseWriter, r *http.Request) {
+	if h.webAuthn == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "passkey login is not configured")
+		return
+	}
+	assertion, session, err := h.webAuthn.BeginDiscoverableLogin(passkeyLoginOptions()...)
+	if err != nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "passkey login is unavailable")
+		return
+	}
+	challengeID, err := randomID()
+	if err != nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "passkey login is unavailable")
+		return
+	}
+	rawSession, err := auth.EncodeSession(session)
+	if err != nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "passkey login is unavailable")
+		return
+	}
+	if err := h.store.CreateWebAuthnChallenge(r.Context(), domain.WebAuthnChallenge{
+		ID:        challengeID,
+		Type:      "login",
+		Session:   rawSession,
+		ExpiresAt: passkeyChallengeExpiresAt(session),
+	}); err != nil {
+		h.logger.Error("create passkey login challenge", "error", err)
+		writeJSONError(w, http.StatusServiceUnavailable, "passkey login is unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"challenge_id": challengeID, "publicKey": assertion.Response})
+}
+
+func (h *Admin) PasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {
+	if h.webAuthn == nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "passkey login is not configured")
+		return
+	}
+	challengeID := strings.TrimSpace(r.URL.Query().Get("challenge_id"))
+	if challengeID == "" {
+		writeJSONError(w, http.StatusBadRequest, "missing challenge")
+		return
+	}
+	loginKey := loginFailureKey(h.clientIP(r))
+	if h.loginFailures.IsLocked(loginKey) {
+		h.auditFailedLogin(r, "", "")
+		writeJSONError(w, http.StatusUnauthorized, "passkey login failed")
+		return
+	}
+	challenge, err := h.store.ConsumeWebAuthnChallenge(r.Context(), challengeID, "login", time.Now().UTC())
 	if err != nil {
 		h.loginFailures.RecordFailure(loginKey)
-		h.auditFailedLogin(r, email, "")
-		h.renderLoginError(w, r, "Invalid email or password")
+		h.auditFailedLogin(r, "", "")
+		writeJSONError(w, http.StatusUnauthorized, "passkey login failed")
 		return
 	}
+	session, err := auth.DecodeSession(challenge.Session)
+	if err != nil {
+		writeJSONError(w, http.StatusUnauthorized, "passkey login failed")
+		return
+	}
+	discoveredUser, credential, err := h.webAuthn.FinishPasskeyLogin(func(rawID, userHandle []byte) (webauthn.User, error) {
+		user, err := h.store.GetUserByCredentialID(r.Context(), rawID)
+		if err != nil {
+			return nil, err
+		}
+		credentials, err := h.store.ListPasskeyCredentials(r.Context(), user.ID)
+		if err != nil {
+			return nil, err
+		}
+		webAuthnCredentials, err := auth.DomainCredentialsToWebAuthn(credentials)
+		if err != nil {
+			return nil, err
+		}
+		return auth.WebAuthnUser{User: user, Credential: webAuthnCredentials}, nil
+	}, session, r)
+	if err != nil {
+		h.loginFailures.RecordFailure(loginKey)
+		h.auditFailedLogin(r, "", "")
+		writeJSONError(w, http.StatusUnauthorized, "passkey login failed")
+		return
+	}
+	webAuthnUser, ok := discoveredUser.(auth.WebAuthnUser)
+	if !ok {
+		writeJSONError(w, http.StatusUnauthorized, "passkey login failed")
+		return
+	}
+	user := webAuthnUser.User
 	if user.Disabled {
 		h.loginFailures.RecordFailure(loginKey)
-		h.auditFailedLogin(r, email, user.ID)
-		h.renderLoginError(w, r, "Invalid email or password")
+		h.auditFailedLogin(r, user.Email, user.ID)
+		writeJSONError(w, http.StatusUnauthorized, "passkey login failed")
 		return
 	}
-
-	ok, err := auth.VerifyPassword(password, user.PasswordHash)
+	domainCredential, err := auth.CredentialToDomain("", user.ID, "", credential)
 	if err != nil {
-		h.logger.Error("verify password", "error", err, "email", email)
-		h.renderLoginError(w, r, "Login unavailable")
+		writeJSONError(w, http.StatusUnauthorized, "passkey login failed")
 		return
 	}
-	if !ok {
-		h.loginFailures.RecordFailure(loginKey)
-		h.auditFailedLogin(r, email, user.ID)
-		h.renderLoginError(w, r, "Invalid email or password")
-		return
-	}
-	if user.MFAEnabled {
-		code := strings.TrimSpace(r.FormValue("otp"))
-		mfaOK := auth.VerifyTOTP(user.MFASecret, code, time.Now().UTC())
-		if !mfaOK {
-			used, err := h.store.ConsumeRecoveryCodeHash(r.Context(), user.ID, auth.RecoveryCodeHash(code))
-			if err != nil {
-				h.logger.Error("consume recovery code", "error", err, "user_id", user.ID)
-				h.renderLoginError(w, r, "Login unavailable")
-				return
-			}
-			mfaOK = used
-			if used {
-				h.auditEvent(r, user.ID, "mfa_recovery_code_used", "user", user.ID)
-			}
-		}
-		if !mfaOK {
-			h.loginFailures.RecordFailure(loginKey)
-			h.auditFailedLogin(r, email, user.ID)
-			h.renderLoginError(w, r, "Invalid email or password")
-			return
-		}
+	now := time.Now().UTC()
+	domainCredential.LastUsedAt = &now
+	if err := h.store.UpdatePasskeyCredential(r.Context(), domainCredential); err != nil {
+		h.logger.Warn("update passkey credential", "error", err, "user_id", user.ID)
 	}
 	h.loginFailures.RecordSuccess(loginKey)
+	if err := h.createAdminSession(w, r, user); err != nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "passkey login is unavailable")
+		return
+	}
+	h.auditEvent(r, user.ID, "login_success", "user", user.ID)
+	writeJSON(w, http.StatusOK, map[string]any{"redirect": "/admin"})
+}
 
+func (h *Admin) createAdminSession(w http.ResponseWriter, r *http.Request, user domain.User) error {
 	sessionID, err := randomID()
 	if err != nil {
 		h.logger.Error("generate session id", "error", err)
-		h.renderLoginError(w, r, "Login unavailable")
-		return
+		return err
 	}
 	csrfToken := middleware.CSRFToken(r)
 	expiresAt := time.Now().UTC().Add(h.sessionTTL)
 	if err := h.store.CreateSession(r.Context(), sessionID, user.ID, csrfToken, expiresAt); err != nil {
 		h.logger.Error("create session", "error", err, "user_id", user.ID)
-		h.renderLoginError(w, r, "Login unavailable")
-		return
+		return err
 	}
-	h.auditEvent(r, user.ID, "login_success", "user", user.ID)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     h.cookieName,
@@ -240,7 +318,7 @@ func (h *Admin) Login(w http.ResponseWriter, r *http.Request) {
 		Secure:   h.cookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	return nil
 }
 
 // Logout explains one unit of behavior in this package.
@@ -263,6 +341,16 @@ func (h *Admin) Logout(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 	http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+}
+
+func writeJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(value)
+}
+
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, map[string]string{"error": message})
 }
 
 // renderLoginError explains one unit of behavior in this package.

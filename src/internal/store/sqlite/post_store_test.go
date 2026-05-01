@@ -617,63 +617,6 @@ func TestSettingsStoreGetAndUpsert(t *testing.T) {
 	}
 }
 
-// TestMFAStoreLifecycle explains one unit of behavior in this package.
-// In Go, functions often return early on errors to keep the success path simple.
-func TestMFAStoreLifecycle(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	store := newTestAuthStore(t)
-
-	user := domain.User{ID: "u-mfa", Email: "mfa@example.com", PasswordHash: "x", Role: domain.RoleAdmin}
-	mustNoErr(t, store.CreateUser(ctx, user))
-
-	updated, err := store.SetUserMFASecret(ctx, user.ID, "ABC123")
-	mustNoErr(t, err)
-	if !updated {
-		t.Fatalf("expected mfa secret update")
-	}
-
-	enabled, err := store.EnableUserMFA(ctx, user.ID)
-	mustNoErr(t, err)
-	if !enabled {
-		t.Fatalf("expected mfa enabled")
-	}
-
-	mustNoErr(t, store.ReplaceRecoveryCodeHashes(ctx, user.ID, []string{"h1", "h2"}))
-	count, err := store.CountUnusedRecoveryCodes(ctx, user.ID)
-	mustNoErr(t, err)
-	if count != 2 {
-		t.Fatalf("expected 2 recovery codes, got %d", count)
-	}
-
-	used, err := store.ConsumeRecoveryCodeHash(ctx, user.ID, "h1")
-	mustNoErr(t, err)
-	if !used {
-		t.Fatalf("expected recovery code consumed")
-	}
-	count, err = store.CountUnusedRecoveryCodes(ctx, user.ID)
-	mustNoErr(t, err)
-	if count != 1 {
-		t.Fatalf("expected 1 unused recovery code, got %d", count)
-	}
-
-	disabled, err := store.DisableUserMFA(ctx, user.ID)
-	mustNoErr(t, err)
-	if !disabled {
-		t.Fatalf("expected mfa disabled")
-	}
-	reloaded, err := store.GetUserByID(ctx, user.ID)
-	mustNoErr(t, err)
-	if reloaded.MFAEnabled || reloaded.MFASecret != "" {
-		t.Fatalf("expected mfa fields reset, got enabled=%v secret=%q", reloaded.MFAEnabled, reloaded.MFASecret)
-	}
-	count, err = store.CountUnusedRecoveryCodes(ctx, user.ID)
-	mustNoErr(t, err)
-	if count != 0 {
-		t.Fatalf("expected recovery codes cleared, got %d", count)
-	}
-}
-
 // newTestAuthStore explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func newTestAuthStore(t *testing.T) *AuthStore {
