@@ -48,6 +48,8 @@ docker run --rm \
 	-e LOG_LEVEL="${LOG_LEVEL:-info}" \
 	-e RENOVATE_PLATFORM=github \
 	-e RENOVATE_TOKEN="${RENOVATE_TOKEN}" \
+	-e RENOVATE_BINARY_SOURCE=install \
+	-e RENOVATE_TRUST_LEVEL=high \
 	-e RENOVATE_ALLOWED_COMMANDS="${renovate_allowed_commands}" \
 	-e RENOVATE_REQUIRE_CONFIG=required \
 	"${renovate_image}" \
