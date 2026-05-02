@@ -123,7 +123,7 @@ func (h *Admin) CreateUser(w http.ResponseWriter, r *http.Request) {
 	h.auditEvent(r, currentUser.ID, "user_invite", "user", newUserID)
 
 	enrollPath := "/admin/enroll?token=" + url.QueryEscape(token)
-	h.renderUsersTableAfterAction(w, r, currentUser, "Enrollment link: "+enrollPath)
+	h.renderUsersTableAfterAction(w, r, currentUser, "Enrollment link created. Copy it now; it is single-use and expires.", enrollPath)
 }
 
 // UpdateUser explains one unit of behavior in this package.
@@ -171,7 +171,7 @@ func (h *Admin) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	h.auditEvent(r, currentUser.ID, "user_update", "user", targetID)
 
-	h.renderUsersTableAfterAction(w, r, currentUser, "User updated")
+	h.renderUsersTableAfterAction(w, r, currentUser, "User updated", "")
 }
 
 // usersData explains one unit of behavior in this package.
@@ -187,6 +187,7 @@ func (h *Admin) usersData(r *http.Request, currentUser domain.User, users []doma
 		"CreateFormErrors": errs,
 		"CurrentUserID":    currentUser.ID,
 		"FlashMessage":     strings.TrimSpace(r.URL.Query().Get("msg")),
+		"EnrollmentLink":   strings.TrimSpace(r.URL.Query().Get("enrollment_link")),
 	}
 }
 
@@ -210,7 +211,7 @@ func (h *Admin) renderUsersTableError(w http.ResponseWriter, r *http.Request, cu
 
 // renderUsersTableAfterAction explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
-func (h *Admin) renderUsersTableAfterAction(w http.ResponseWriter, r *http.Request, currentUser domain.User, message string) {
+func (h *Admin) renderUsersTableAfterAction(w http.ResponseWriter, r *http.Request, currentUser domain.User, message, enrollmentLink string) {
 	if middleware.IsHTMX(r) {
 		users, err := h.store.ListUsers(r.Context())
 		if err != nil {
@@ -219,11 +220,16 @@ func (h *Admin) renderUsersTableAfterAction(w http.ResponseWriter, r *http.Reque
 		}
 		data := h.usersData(r, currentUser, users, userCreateForm{}, nil)
 		data["FlashMessage"] = message
+		data["EnrollmentLink"] = enrollmentLink
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = h.renderer.Render(w, "partial-users-table", data)
 		return
 	}
-	http.Redirect(w, r, "/admin/users?msg="+url.QueryEscape(message), http.StatusSeeOther)
+	redirectURL := "/admin/users?msg=" + url.QueryEscape(message)
+	if enrollmentLink != "" {
+		redirectURL += "&enrollment_link=" + url.QueryEscape(enrollmentLink)
+	}
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 // parseAndValidateCreateUserForm explains one unit of behavior in this package.

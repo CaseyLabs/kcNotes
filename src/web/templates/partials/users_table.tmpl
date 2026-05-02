@@ -39,6 +39,13 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
     <div class="mt-3">
       <button type="submit" class="btn btn-primary focus-ring">Create Enrollment Link</button>
     </div>
+    {{ if .EnrollmentLink }}
+      <div class="copy-field mt-4" data-enrollment-link>
+        <span class="copy-field-label">Enrollment link</span>
+        <code class="copy-field-value">{{ .EnrollmentLink }}</code>
+        <button type="button" class="btn btn-secondary btn-xs focus-ring" data-copy-value="{{ .EnrollmentLink }}">Copy</button>
+      </div>
+    {{ end }}
   </form>
 
   <div class="table-wrap">

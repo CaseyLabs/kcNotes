@@ -189,6 +189,61 @@ function showPasskeyError(message) {
   }
 }
 
+function copyText(value) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(value);
+  }
+
+  return new Promise(function (resolve, reject) {
+    var input = document.createElement("textarea");
+    input.value = value;
+    input.setAttribute("readonly", "readonly");
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    document.body.appendChild(input);
+    input.select();
+
+    try {
+      if (!document.execCommand("copy")) {
+        throw new Error("Copy failed");
+      }
+      resolve();
+    } catch (error) {
+      reject(error);
+    } finally {
+      document.body.removeChild(input);
+    }
+  });
+}
+
+document.body.addEventListener("click", function (event) {
+  var button = event.target.closest("[data-copy-value]");
+  if (!button) {
+    return;
+  }
+
+  var value = button.getAttribute("data-copy-value");
+  if (!value) {
+    return;
+  }
+
+  var originalText = button.textContent;
+  setBusy(button, true);
+  copyText(value)
+    .then(function () {
+      button.textContent = "Copied";
+      window.setTimeout(function () {
+        button.textContent = originalText;
+      }, 1600);
+    })
+    .catch(function () {
+      showPasskeyError("Copy failed. Select the link and copy it manually.");
+    })
+    .finally(function () {
+      setBusy(button, false);
+    });
+});
+
 function passkeysAvailable() {
   return !!(window.PublicKeyCredential && navigator.credentials);
 }

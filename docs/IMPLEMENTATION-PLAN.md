@@ -290,17 +290,33 @@ Passkey-only admin authentication is the active baseline.
 - Passkey challenges are single-use and expire.
 - A user cannot delete their last remaining passkey.
 
+### O1: Passkey Recovery and Admin UX
+
+The selected O1 recovery and admin UX work is implemented without adding a
+password, TOTP, recovery-code, email-delivery, or self-service recovery path.
+
+- `README.md` documents operator recovery for cases where every admin loses
+  passkeys, using database-admin creation of a normal single-use enrollment
+  invitation.
+- `/admin/users` still creates admin-only, single-use, expiring enrollment
+  invitations through the existing POST route.
+- After successful invitation creation, the users UI renders the enrollment
+  path as a distinct copyable value instead of only embedding it in a flash
+  message.
+- Invalid invitation submissions return validation errors without rendering a
+  stale enrollment link.
+- The copy action uses the existing self-hosted JavaScript bundle; no new
+  dependency was added.
+
 ## Optional Backlog
 
 These items are useful, but they are not required for the current documented
 completion scope.
 
-### O1: Passkey Recovery and Admin UX
+### O1: Passkey Attestation Policy
 
-- Operator recovery guidance for cases where every admin loses every passkey.
-- Cleaner enrollment-link presentation and copy action in the users UI.
-- Optional passkey attestation policy if the deployment needs hardware-key-only
-  enrollment.
+Optional passkey attestation policy remains backlog if a deployment needs
+hardware-key-only enrollment. No attestation enforcement is active by default.
 
 ### O2: Media Processing Pipeline
 

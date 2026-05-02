@@ -27,8 +27,9 @@ Before changing app behavior, read:
 2. `docs/IMPLEMENTATION-PLAN.md` for current implementation status and
    remaining required work.
 
-As of `docs/IMPLEMENTATION-PLAN.md` dated 2026-04-30, the required R1 autosave
-scope is implemented for existing post/page edit forms.
+As of `docs/IMPLEMENTATION-PLAN.md` dated 2026-05-01, the required autosave,
+passkey-only authentication cleanup, and O1 passkey recovery/admin UX scopes
+are implemented.
 
 ## Public Interface
 
@@ -103,8 +104,9 @@ repository itself.
 - Follow `src/AGENTS.md` for app code.
 - Use TDD by default for app features, bug fixes, and behavior changes.
 - Add or update tests for code behavior; do not write tests for prose-only content, filenames, or directory layout.
-- Keep auth, RBAC, CSRF, session, MFA, rate-limit, upload, content-sanitization,
-  static-publish, and replica consistency behavior explicit and covered by focused tests when changed.
+- Keep passkey-only auth, RBAC, CSRF, session, rate-limit, upload,
+  content-sanitization, static-publish, and replica consistency behavior
+  explicit and covered by focused tests when changed.
 - Keep new and updated source comments teaching-oriented where the code is not obvious, especially in security, persistence, HTTP, template, and workflow paths.
 
 ## Root Workflow Rules
