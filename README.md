@@ -134,6 +134,55 @@ you pin another local port, set `WEBAUTHN_ORIGINS` to that origin. Deployed
 environments should serve admin routes over HTTPS and set the WebAuthn
 relying-party values below.
 
+## Operator Passkey Recovery
+
+If every admin loses access to their passkeys, recover with database operator
+access instead of adding a password or recovery-code login path. Prefer
+restoring a known-good database backup first. If that is not available, issue a
+new single-use enrollment invitation directly in the database, then complete
+normal browser enrollment at `/admin/enroll`.
+
+For the default local SQLite database, stop the app and back up the database
+before editing it:
+
+```bash
+make stop
+cp src/data/cms.db "src/data/cms.db.$(date +%Y%m%d%H%M%S).bak"
+```
+
+Create a pending admin and invitation. Replace `operator@example.com` with the
+operator email and set `DB_FILE` if the deployment uses a different local
+database path:
+
+```bash
+DB_FILE="${DB_FILE:-src/data/cms.db}"
+EMAIL="operator@example.com"
+USER_ID="$(uuidgen)"
+INVITE_ID="$(uuidgen)"
+TOKEN="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=')"
+TOKEN_HASH="$(printf '%s' "$TOKEN" | sha256sum | awk '{print $1}')"
+ADMIN_SQL="SELECT id FROM users WHERE role = 'admin' LIMIT 1;"
+CREATED_BY="$(sqlite3 "$DB_FILE" "$ADMIN_SQL")"
+: "${CREATED_BY:?no existing admin user found; use /admin/setup}"
+
+sqlite3 "$DB_FILE" <<SQL
+INSERT INTO users(id, email, password_hash, role, disabled)
+VALUES ('$USER_ID', '$EMAIL', '', 'admin', 1);
+
+INSERT INTO user_enrollment_invitations(id, user_id, token_hash, expires_at, created_by)
+VALUES ('$INVITE_ID', '$USER_ID', '$TOKEN_HASH', datetime('now', '+7 days'), '$CREATED_BY');
+SQL
+
+printf 'Open /admin/enroll?token=%s\n' "$TOKEN"
+```
+
+Restart the app, open the printed enrollment link over the configured WebAuthn
+origin, and finish passkey enrollment in the browser. The invitation is still
+single-use and expiring; successful enrollment enables the user. Do not write
+password hashes, clear existing passkeys, or disable WebAuthn checks as part of
+recovery. For remote Turso/libSQL deployments, run the same SQL through the
+provider's administrative SQL access after taking a backup or snapshot.
+
 ## Configuration
 
 Common environment variables:
