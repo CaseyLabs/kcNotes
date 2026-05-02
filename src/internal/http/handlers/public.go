@@ -58,7 +58,7 @@ func (h *Public) Home(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = h.renderer.Render(w, "home", map[string]any{
-		"Title":         "Go + HTMX CMS",
+		"Title":         "kcNotes",
 		"Posts":         posts,
 		"AssetBase":     "/static",
 		"ShowAdminLink": true,

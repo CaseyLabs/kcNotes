@@ -12,19 +12,20 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 {{ define "admin-dashboard" }}
   {{ template "shell-start" . }}
   <main class="page-main">
-    <section>
-      <h2 class="page-title">Admin</h2>
-      <p class="page-lede">Signed in as {{ .UserEmail }} ({{ .UserRole }}).</p>
-      <div class="mt-4">
-        {{ template "partial-admin-nav" . }}
+    <section class="page-heading">
+      <div>
+        <h2 class="page-title">Admin</h2>
+        <p class="page-lede">{{ .UserEmail }} · {{ .UserRole }}</p>
       </div>
-      <div class="mt-4 flex flex-wrap gap-2">
-        <a href="/admin/posts/new" class="btn btn-primary focus-ring">New Post</a>
-        <form method="post" action="/admin/logout">
-          <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
-          <button type="submit" class="btn btn-secondary focus-ring">Logout</button>
-        </form>
-      </div>
+      {{ template "partial-admin-nav" . }}
+    </section>
+
+    <section class="admin-action-strip">
+      <a href="/admin/posts/new" class="btn btn-primary focus-ring">New Post</a>
+      <form method="post" action="/admin/logout">
+        <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
+        <button type="submit" class="btn btn-secondary focus-ring">Logout</button>
+      </form>
     </section>
   </main>
   {{ template "shell-end" . }}

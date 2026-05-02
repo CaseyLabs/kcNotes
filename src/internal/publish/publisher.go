@@ -370,7 +370,7 @@ func (p *Publisher) writeRSS(outDir string, posts []domain.Post) error {
 	doc := rss{
 		Version: "2.0",
 		Channel: channel{
-			Title:         "Go + HTMX CMS",
+			Title:         "kcNotes",
 			Link:          p.absoluteURL("/"),
 			Description:   "Published posts",
 			LastBuildDate: lastBuild.Format(time.RFC1123Z),

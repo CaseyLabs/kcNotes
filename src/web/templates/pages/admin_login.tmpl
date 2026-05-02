@@ -11,14 +11,14 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 
 {{ define "admin-login" }}
   {{ template "shell-start" . }}
-  <main class="panel mx-auto max-w-md">
+  <main class="panel auth-panel">
     <h2 class="page-title">Admin Login</h2>
-    <p class="mt-1 text-sm muted">Sign in with a passkey.</p>
+    <p class="mt-1 text-sm muted">Use a passkey to continue.</p>
     {{ if .Error }}
       <div class="flash-error mt-4">{{ .Error }}</div>
     {{ end }}
     <button class="btn btn-primary focus-ring mt-5 w-full" type="button" data-passkey-login>Sign In With Passkey</button>
-    <p class="mt-4 text-sm muted">New site? Open <a class="admin-link focus-ring" href="/admin/setup">first admin setup</a>.</p>
+    <p class="mt-4 text-sm muted">New site? <a class="font-medium underline" href="/admin/setup">Set up the first admin</a>.</p>
   </main>
   {{ template "shell-end" . }}
 {{ end }}

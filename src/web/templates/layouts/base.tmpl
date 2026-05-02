@@ -25,18 +25,27 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
   <body>
     <div class="app-shell">
       <header class="app-header">
-        <div class="space-y-1">
-          <h1 class="app-title">Go + HTMX CMS</h1>
-          <p class="app-subtitle">Server-rendered admin with HTMX partial updates.</p>
-        </div>
+        <div class="app-header-inner">
+          <div class="header-left">
+            <a href="/" class="site-brand focus-ring">
+              <span class="app-title">kcNotes</span>
+            </a>
+          </div>
 
-        <div class="flex flex-wrap items-center gap-2">
-          <a href="/" class="admin-link focus-ring">Home</a>
-          <a href="/admin" class="admin-link focus-ring">Admin</a>
-          <button type="button" class="theme-toggle focus-ring" data-theme-toggle aria-label="Cycle theme mode">
-            Theme
-            <span class="theme-toggle-state" data-theme-label>System</span>
-          </button>
+          <div class="top-actions">
+            <button type="button" class="theme-toggle focus-ring" data-theme-toggle aria-label="Cycle theme mode">
+              <svg class="theme-toggle-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                />
+              </svg>
+              <span class="sr-only" data-theme-label>System</span>
+            </button>
+            <a href="/admin/login" class="admin-link focus-ring">Login</a>
+          </div>
         </div>
       </header>
 
@@ -45,6 +54,9 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 {{ end }}
 
 {{ define "shell-end" }}
+      <footer class="app-footer">
+        <p>Built with Go, HTMX, and SQLite-compatible storage.</p>
+      </footer>
     </div>
   </body>
 </html>

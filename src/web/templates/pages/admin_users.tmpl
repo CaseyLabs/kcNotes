@@ -12,10 +12,10 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 {{ define "admin-users" }}
   {{ template "shell-start" . }}
   <main class="page-main">
-    <section class="flex flex-wrap items-center justify-between gap-3">
+    <section class="page-heading">
       <div>
         <h2 class="page-title">Users</h2>
-        <p class="page-lede">Create users, change roles, and disable access.</p>
+        <p class="page-lede">Invite users and manage access.</p>
       </div>
       {{ template "partial-admin-nav" . }}
     </section>

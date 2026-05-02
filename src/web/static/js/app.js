@@ -313,7 +313,7 @@ bindPasskeyRegistration(
 
 /*
   THEME MANAGEMENT OVERVIEW:
-  - The default mode is "system", which means CSS `prefers-color-scheme` decides.
+  - The default mode is "dark", matching the app's primary admin/public design.
   - Manual overrides ("light" / "dark") are stored in localStorage so the user's
     preference persists between page loads.
   - We keep state on `<html data-theme="...">`:
@@ -342,7 +342,7 @@ var THEME_MODES = ["system", "light", "dark"];
 function getStoredThemeMode() {
   var stored = localStorage.getItem(THEME_STORAGE_KEY);
   if (THEME_MODES.indexOf(stored) === -1) {
-    return "system";
+    return "dark";
   }
   return stored;
 }

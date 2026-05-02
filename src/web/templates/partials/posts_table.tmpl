@@ -81,7 +81,13 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
           {{ end }}
         {{ else }}
           <tr>
-            <td colspan="6" class="px-4 py-8 text-center text-slate-500">No posts matched this filter.</td>
+            <td colspan="6" class="px-4 py-8">
+              <div class="empty-state">
+                <h3 class="text-base font-semibold text-slate-900">No content matched</h3>
+                <p class="text-sm muted">Adjust the filters or create a new post.</p>
+                <a href="/admin/posts/new" class="btn btn-primary focus-ring">New Post</a>
+              </div>
+            </td>
           </tr>
         {{ end }}
       </tbody>

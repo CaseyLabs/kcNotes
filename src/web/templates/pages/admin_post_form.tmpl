@@ -12,10 +12,10 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 {{ define "admin-post-form" }}
   {{ template "shell-start" . }}
   <main class="page-main">
-    <section class="flex flex-wrap items-center justify-between gap-3">
+    <section class="page-heading">
       <div>
         <h2 class="page-title">{{ .Title }}</h2>
-        <p class="page-lede">Use Markdown for body content.</p>
+        <p class="page-lede">Write in Markdown.</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         {{ template "partial-admin-nav" . }}

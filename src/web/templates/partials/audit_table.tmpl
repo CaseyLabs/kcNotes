@@ -60,7 +60,12 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
           {{ end }}
         {{ else }}
           <tr>
-            <td colspan="5" class="px-4 py-8 text-center text-slate-500">No audit events matched this filter.</td>
+            <td colspan="5" class="px-4 py-8">
+              <div class="empty-state">
+                <h3 class="text-base font-semibold text-slate-900">No audit events matched</h3>
+                <p class="text-sm muted">Change the search or action filter.</p>
+              </div>
+            </td>
           </tr>
         {{ end }}
       </tbody>

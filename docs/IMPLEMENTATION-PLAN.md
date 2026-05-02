@@ -230,7 +230,8 @@ the UI refresh.
 - Semantic CSS tokens for background, surface, text, border, accent/focus, and
   status colors.
 - Light/dark theme support with CSS custom properties.
-- Default `system` theme behavior using `prefers-color-scheme`.
+- Dark default UI aligned with the goCRUD reference design, with optional
+  `system` behavior still using `prefers-color-scheme`.
 - Manual theme cycle:
   - `system`;
   - `light`;
@@ -240,6 +241,11 @@ the UI refresh.
 - Shared header theme toggle.
 - Shared admin navigation partial.
 - Responsive admin/public templates using shared component classes.
+- Brand-first public home layout with compact top navigation, centered
+  `kcNotes` identity, simplified copy, and stronger empty state.
+- Public post/page templates use quieter article layouts without heavy panels.
+- Admin pages use consistent heading/navigation structure, clearer primary
+  actions, and friendlier table empty states.
 - README documents theme behavior.
 
 ## Required Remaining Work

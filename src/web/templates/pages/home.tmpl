@@ -12,30 +12,36 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 {{ define "home" }}
   {{ template "shell-start" . }}
   <main class="page-main">
-    <section class="space-y-2">
-      <h2 class="page-title">Published Posts</h2>
-      <p class="page-lede">Public content is rendered from Markdown with strict sanitization.</p>
+    <section class="page-heading">
+      <div class="hero-copy">
+        <h2 class="hero-title">kcNotes Blog</h2>
+        <p class="page-lede">Insights, release notes, and published updates from kcNotes.</p>
+      </div>
     </section>
-    <section class="panel">
+
+    <section>
       {{ if .Posts }}
-        <ul class="space-y-3">
+        <ul class="content-list">
           {{ range .Posts }}
-            <li class="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
+            <li class="content-list-item">
               <div>
-                <a class="font-medium text-slate-900 hover:underline" href="/p/{{ .Slug }}/">{{ .Title }}</a>
-                <p class="text-sm text-slate-500">{{ .UpdatedAt.Format "2006-01-02" }}</p>
+                <a class="text-lg font-semibold text-slate-900 hover:underline" href="/p/{{ .Slug }}/">{{ .Title }}</a>
+                <div class="content-list-meta">
+                  <span>Updated {{ .UpdatedAt.Format "2006-01-02" }}</span>
+                  <span>{{ .Type }}</span>
+                </div>
               </div>
-              <span class="rounded bg-slate-100 px-2 py-1 text-xs table-cell-muted">{{ .Type }}</span>
+              <a class="btn btn-secondary btn-sm focus-ring" href="/p/{{ .Slug }}/">Read</a>
             </li>
           {{ end }}
         </ul>
       {{ else }}
-        <p class="muted">No published posts yet.</p>
+        <div class="empty-state">
+          <h3 class="text-base font-semibold text-slate-900">No posts yet</h3>
+          <p class="max-w-md text-sm muted">Check back soon. New content is on its way.</p>
+        </div>
       {{ end }}
     </section>
-    {{ if .ShowAdminLink }}
-      <a href="/admin" class="btn btn-primary focus-ring">Open Admin</a>
-    {{ end }}
   </main>
   {{ template "shell-end" . }}
 {{ end }}

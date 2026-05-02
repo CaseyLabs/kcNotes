@@ -12,10 +12,10 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 {{ define "admin-media" }}
   {{ template "shell-start" . }}
   <main class="page-main">
-    <section class="flex flex-wrap items-center justify-between gap-3">
+    <section class="page-heading">
       <div>
         <h2 class="page-title">Media</h2>
-        <p class="page-lede">Upload validated images and copy static publish paths.</p>
+        <p class="page-lede">Upload images and copy static paths.</p>
       </div>
       {{ template "partial-admin-nav" . }}
     </section>

@@ -79,7 +79,12 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
           {{ end }}
         {{ else }}
           <tr>
-            <td colspan="5" class="px-4 py-8 text-center text-slate-500">No users found.</td>
+            <td colspan="5" class="px-4 py-8">
+              <div class="empty-state">
+                <h3 class="text-base font-semibold text-slate-900">No users found</h3>
+                <p class="text-sm muted">Create an enrollment link to invite the first user.</p>
+              </div>
+            </td>
           </tr>
         {{ end }}
       </tbody>
