@@ -25,7 +25,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
           {{ range .Posts }}
             <li class="content-list-item">
               <div>
-                <a class="text-lg font-semibold text-slate-900 hover:underline" href="/p/{{ .Slug }}/">{{ .Title }}</a>
+                <a class="text-lg font-semibold text-[var(--color-text)] hover:underline" href="/p/{{ .Slug }}/">{{ .Title }}</a>
                 <div class="content-list-meta">
                   <span>Updated {{ .UpdatedAt.Format "2006-01-02" }}</span>
                   <span>{{ .Type }}</span>
@@ -37,7 +37,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
         </ul>
       {{ else }}
         <div class="empty-state">
-          <h3 class="text-base font-semibold text-slate-900">No posts yet</h3>
+          <h3 class="text-base font-semibold text-[var(--color-text)]">No posts yet</h3>
           <p class="max-w-md text-sm muted">Check back soon. New content is on its way.</p>
         </div>
       {{ end }}

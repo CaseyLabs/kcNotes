@@ -1,14 +1,13 @@
 /*
   TEACHING NOTES (Tailwind input stylesheet):
   - This file is the source stylesheet consumed by Tailwind's build step.
-  - `@tailwind base/components/utilities` are framework directives (not normal CSS rules).
-  - Tailwind expands these directives into concrete CSS based on class usage in templates.
+  - `@import "tailwindcss"` loads Tailwind v4's framework CSS.
+  - `@source` lists the app files Tailwind scans for utility classes.
   - Keep custom CSS small and prefer utility classes in templates for consistency.
 */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" source(none);
+@source "../../templates/**/*.tmpl";
 
 /*
   THEME FOUNDATION:
@@ -23,15 +22,15 @@
   --font-sans: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
 
-  --color-bg: #020617;
-  --color-bg-accent: #1e3a8a;
-  --color-surface: #111827;
-  --color-surface-muted: #1e293b;
-  --color-border: rgb(255 255 255 / 12%);
-  --color-text: #f8fafc;
-  --color-text-muted: #cbd5e1;
-  --color-primary: #3b82f6;
-  --color-primary-hover: #60a5fa;
+  --color-bg: #0f1115;
+  --color-bg-accent: #1f2937;
+  --color-surface: #171a21;
+  --color-surface-muted: #202530;
+  --color-border: rgb(255 255 255 / 13%);
+  --color-text: #f4f7fb;
+  --color-text-muted: #b8c0cc;
+  --color-primary: #2f81f7;
+  --color-primary-hover: #58a6ff;
   --color-on-primary: #ffffff;
   --color-focus: #93c5fd;
   --color-success-bg: rgb(16 185 129 / 12%);
@@ -43,35 +42,25 @@
   --color-danger-bg: rgb(239 68 68 / 12%);
   --color-danger-border: rgb(248 113 113 / 35%);
   --color-danger-text: #fecaca;
-  --shadow-soft: 0 18px 50px rgb(15 23 42 / 34%);
-  --shadow-soft-hover: 0 22px 60px rgb(15 23 42 / 44%);
-  --surface-panel: rgb(255 255 255 / 5%);
-  --surface-soft-panel: rgb(255 255 255 / 5%);
-  --surface-empty-state: rgb(255 255 255 / 5%);
-  --surface-header: rgb(2 6 23 / 72%);
-  --surface-footer: rgb(2 6 23 / 58%);
+  --shadow-soft: 0 12px 32px rgb(0 0 0 / 22%);
+  --shadow-soft-hover: 0 16px 40px rgb(0 0 0 / 28%);
+  --surface-panel: rgb(255 255 255 / 4%);
+  --surface-soft-panel: rgb(255 255 255 / 4%);
+  --surface-empty-state: rgb(255 255 255 / 4%);
+  --surface-header: rgb(15 17 21 / 88%);
+  --surface-footer: rgb(15 17 21 / 78%);
   --background-page:
-    radial-gradient(
-      1200px 600px at 15% 0%,
-      rgb(59 130 246 / 18%),
-      transparent 60%
-    ),
-    radial-gradient(
-      900px 500px at 85% 10%,
-      rgb(99 102 241 / 16%),
-      transparent 55%
-    ),
-    linear-gradient(135deg, #020617 0%, #0f172a 45%, #020617 100%);
+    linear-gradient(180deg, rgb(47 129 247 / 8%) 0%, transparent 22%), #0f1115;
 }
 
 @media (prefers-color-scheme: light) {
   :root {
     color-scheme: light;
     --color-bg: #f8fafc;
-    --color-bg-accent: #dbeafe;
+    --color-bg-accent: #e5e7eb;
     --color-surface: #ffffff;
-    --color-surface-muted: #eef2ff;
-    --color-border: #dbe3ef;
+    --color-surface-muted: #f1f5f9;
+    --color-border: #d7dde6;
     --color-text: #0f172a;
     --color-text-muted: #475569;
     --color-primary: #2563eb;
@@ -89,33 +78,23 @@
     --color-danger-text: #9f1239;
     --shadow-soft: 0 12px 36px rgb(15 23 42 / 12%);
     --shadow-soft-hover: 0 16px 44px rgb(15 23 42 / 16%);
-    --surface-panel: rgb(255 255 255 / 82%);
-    --surface-soft-panel: rgb(255 255 255 / 74%);
-    --surface-empty-state: rgb(255 255 255 / 74%);
-    --surface-header: rgb(248 250 252 / 82%);
-    --surface-footer: rgb(248 250 252 / 72%);
+    --surface-panel: rgb(255 255 255 / 88%);
+    --surface-soft-panel: rgb(255 255 255 / 78%);
+    --surface-empty-state: rgb(255 255 255 / 78%);
+    --surface-header: rgb(248 250 252 / 92%);
+    --surface-footer: rgb(248 250 252 / 82%);
     --background-page:
-      radial-gradient(
-        1000px 480px at 15% 0%,
-        rgb(59 130 246 / 10%),
-        transparent 60%
-      ),
-      radial-gradient(
-        800px 420px at 85% 10%,
-        rgb(99 102 241 / 9%),
-        transparent 55%
-      ),
-      linear-gradient(135deg, #f8fafc 0%, #eef2ff 48%, #f8fafc 100%);
+      linear-gradient(180deg, rgb(37 99 235 / 6%) 0%, transparent 24%), #f8fafc;
   }
 }
 
 html[data-theme="light"] {
   color-scheme: light;
   --color-bg: #f8fafc;
-  --color-bg-accent: #dbeafe;
+  --color-bg-accent: #e5e7eb;
   --color-surface: #ffffff;
-  --color-surface-muted: #eef2ff;
-  --color-border: #dbe3ef;
+  --color-surface-muted: #f1f5f9;
+  --color-border: #d7dde6;
   --color-text: #0f172a;
   --color-text-muted: #475569;
   --color-primary: #2563eb;
@@ -133,36 +112,26 @@ html[data-theme="light"] {
   --color-danger-text: #9f1239;
   --shadow-soft: 0 12px 36px rgb(15 23 42 / 12%);
   --shadow-soft-hover: 0 16px 44px rgb(15 23 42 / 16%);
-  --surface-panel: rgb(255 255 255 / 82%);
-  --surface-soft-panel: rgb(255 255 255 / 74%);
-  --surface-empty-state: rgb(255 255 255 / 74%);
-  --surface-header: rgb(248 250 252 / 82%);
-  --surface-footer: rgb(248 250 252 / 72%);
+  --surface-panel: rgb(255 255 255 / 88%);
+  --surface-soft-panel: rgb(255 255 255 / 78%);
+  --surface-empty-state: rgb(255 255 255 / 78%);
+  --surface-header: rgb(248 250 252 / 92%);
+  --surface-footer: rgb(248 250 252 / 82%);
   --background-page:
-    radial-gradient(
-      1000px 480px at 15% 0%,
-      rgb(59 130 246 / 10%),
-      transparent 60%
-    ),
-    radial-gradient(
-      800px 420px at 85% 10%,
-      rgb(99 102 241 / 9%),
-      transparent 55%
-    ),
-    linear-gradient(135deg, #f8fafc 0%, #eef2ff 48%, #f8fafc 100%);
+    linear-gradient(180deg, rgb(37 99 235 / 6%) 0%, transparent 24%), #f8fafc;
 }
 
 html[data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #020617;
-  --color-bg-accent: #1e3a8a;
-  --color-surface: #111827;
-  --color-surface-muted: #1e293b;
-  --color-border: rgb(255 255 255 / 12%);
-  --color-text: #f8fafc;
-  --color-text-muted: #cbd5e1;
-  --color-primary: #3b82f6;
-  --color-primary-hover: #60a5fa;
+  --color-bg: #0f1115;
+  --color-bg-accent: #1f2937;
+  --color-surface: #171a21;
+  --color-surface-muted: #202530;
+  --color-border: rgb(255 255 255 / 13%);
+  --color-text: #f4f7fb;
+  --color-text-muted: #b8c0cc;
+  --color-primary: #2f81f7;
+  --color-primary-hover: #58a6ff;
   --color-on-primary: #ffffff;
   --color-focus: #93c5fd;
   --color-success-bg: rgb(16 185 129 / 12%);
@@ -174,25 +143,15 @@ html[data-theme="dark"] {
   --color-danger-bg: rgb(239 68 68 / 12%);
   --color-danger-border: rgb(248 113 113 / 35%);
   --color-danger-text: #fecaca;
-  --shadow-soft: 0 18px 50px rgb(15 23 42 / 34%);
-  --shadow-soft-hover: 0 22px 60px rgb(15 23 42 / 44%);
-  --surface-panel: rgb(255 255 255 / 5%);
-  --surface-soft-panel: rgb(255 255 255 / 5%);
-  --surface-empty-state: rgb(255 255 255 / 5%);
-  --surface-header: rgb(2 6 23 / 72%);
-  --surface-footer: rgb(2 6 23 / 58%);
+  --shadow-soft: 0 12px 32px rgb(0 0 0 / 22%);
+  --shadow-soft-hover: 0 16px 40px rgb(0 0 0 / 28%);
+  --surface-panel: rgb(255 255 255 / 4%);
+  --surface-soft-panel: rgb(255 255 255 / 4%);
+  --surface-empty-state: rgb(255 255 255 / 4%);
+  --surface-header: rgb(15 17 21 / 88%);
+  --surface-footer: rgb(15 17 21 / 78%);
   --background-page:
-    radial-gradient(
-      1200px 600px at 15% 0%,
-      rgb(59 130 246 / 18%),
-      transparent 60%
-    ),
-    radial-gradient(
-      900px 500px at 85% 10%,
-      rgb(99 102 241 / 16%),
-      transparent 55%
-    ),
-    linear-gradient(135deg, #020617 0%, #0f172a 45%, #020617 100%);
+    linear-gradient(180deg, rgb(47 129 247 / 8%) 0%, transparent 22%), #0f1115;
 }
 
 @layer base {
@@ -293,19 +252,19 @@ html[data-theme="dark"] {
   }
 
   .panel {
-    border-radius: 1rem;
+    border-radius: 0.5rem;
     border: 1px solid var(--color-border);
     padding: 1.5rem;
     background-color: var(--surface-panel);
     box-shadow: var(--shadow-soft);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(8px);
   }
 
   .soft-panel {
-    border-radius: 1rem;
+    border-radius: 0.5rem;
     border: 1px solid var(--color-border);
     background-color: var(--surface-soft-panel);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(8px);
   }
 
   .prose-content {
@@ -415,12 +374,12 @@ html[data-theme="dark"] {
     display: grid;
     gap: 0.9rem;
     justify-items: center;
-    border-radius: 1rem;
+    border-radius: 0.5rem;
     border: 1px dashed var(--color-border);
     padding: 3rem 1.5rem;
     text-align: center;
     background-color: var(--surface-empty-state);
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(8px);
   }
 
   .empty-state h3,
@@ -485,7 +444,7 @@ html[data-theme="dark"] {
   .admin-link {
     display: inline-flex;
     align-items: center;
-    border-radius: 999px;
+    border-radius: 0.5rem;
     border: 1px solid transparent;
     padding: 0.5rem 0.9rem;
     font-size: 0.875rem;
@@ -508,7 +467,7 @@ html[data-theme="dark"] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 999px;
+    border-radius: 0.5rem;
     border: 1px solid transparent;
     padding: 0.6rem 1.25rem;
     font-size: 0.875rem;
@@ -565,7 +524,7 @@ html[data-theme="dark"] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 999px;
+    border-radius: 0.5rem;
     border: 1px solid var(--color-border);
     width: 2.5rem;
     height: 2.5rem;
@@ -583,7 +542,7 @@ html[data-theme="dark"] {
   }
 
   .theme-toggle-state {
-    border-radius: 999px;
+    border-radius: 0.5rem;
     padding: 0.125rem 0.5rem;
     font-size: 0.75rem;
     font-weight: 600;
@@ -692,7 +651,7 @@ html[data-theme="dark"] {
 
   .table-wrap {
     overflow-x: auto;
-    border-radius: 0.75rem;
+    border-radius: 0.5rem;
     border: 1px solid var(--color-border);
     border-color: var(--color-border);
     background-color: var(--color-surface);
@@ -777,61 +736,6 @@ html[data-theme="dark"] {
   .focus-ring:focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
-  }
-
-  /*
-    THEME BRIDGE:
-    - Existing templates still contain many Slate utility classes.
-    - We remap the frequently used Slate classes to semantic tokens so old and
-      new markup can coexist while we continue template cleanup.
-  */
-  .bg-white {
-    background-color: var(--color-surface) !important;
-  }
-
-  .bg-slate-50,
-  .bg-slate-100 {
-    background-color: var(--color-surface-muted) !important;
-  }
-
-  .text-slate-900,
-  .text-slate-800,
-  .text-slate-700 {
-    color: var(--color-text) !important;
-  }
-
-  .text-slate-600,
-  .text-slate-500 {
-    color: var(--color-text-muted) !important;
-  }
-
-  .border-slate-100,
-  .border-slate-200,
-  .border-slate-300,
-  .border-slate-400 {
-    border-color: var(--color-border) !important;
-  }
-
-  .bg-slate-900 {
-    background-color: var(--color-primary) !important;
-    color: var(--color-on-primary) !important;
-  }
-
-  .bg-slate-800 {
-    background-color: color-mix(
-      in oklab,
-      var(--color-primary) 86%,
-      var(--color-surface)
-    ) !important;
-    color: var(--color-on-primary) !important;
-  }
-
-  .hover\:bg-slate-700:hover {
-    background-color: var(--color-primary-hover) !important;
-  }
-
-  .hover\:bg-slate-100:hover {
-    background-color: var(--color-surface-muted) !important;
   }
 
   @media (min-width: 640px) {

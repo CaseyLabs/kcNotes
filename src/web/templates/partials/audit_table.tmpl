@@ -35,7 +35,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
   </form>
 
   <div class="table-wrap">
-    <table class="data-table min-w-[760px] divide-y divide-slate-200">
+    <table class="data-table min-w-[760px] divide-y divide-[var(--color-border)]">
       <thead class="table-header">
         <tr>
           <th class="px-4 py-3 text-left font-medium">Time (UTC)</th>
@@ -45,24 +45,24 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
           <th class="px-4 py-3 text-left font-medium">IP</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-100">
+      <tbody class="divide-y divide-[var(--color-border)]">
         {{ if .Events }}
           {{ range .Events }}
             <tr>
-              <td class="px-4 py-3 text-slate-600">{{ .CreatedAt.Format "2006-01-02 15:04:05" }}</td>
-              <td class="px-4 py-3 text-slate-700">
+              <td class="px-4 py-3 muted">{{ .CreatedAt.Format "2006-01-02 15:04:05" }}</td>
+              <td class="px-4 py-3 text-[var(--color-text)]">
                 {{ if .ActorEmail }}{{ .ActorEmail }}{{ else }}system{{ end }}
               </td>
-              <td class="px-4 py-3 font-mono text-xs text-slate-700">{{ .Action }}</td>
-              <td class="px-4 py-3 text-slate-700">{{ .EntityType }}{{ if .EntityID }}:{{ .EntityID }}{{ end }}</td>
-              <td class="px-4 py-3 text-slate-500">{{ if .IP }}{{ .IP }}{{ else }}-{{ end }}</td>
+              <td class="px-4 py-3 font-mono text-xs text-[var(--color-text)]">{{ .Action }}</td>
+              <td class="px-4 py-3 text-[var(--color-text)]">{{ .EntityType }}{{ if .EntityID }}:{{ .EntityID }}{{ end }}</td>
+              <td class="px-4 py-3 muted">{{ if .IP }}{{ .IP }}{{ else }}-{{ end }}</td>
             </tr>
           {{ end }}
         {{ else }}
           <tr>
             <td colspan="5" class="px-4 py-8">
               <div class="empty-state">
-                <h3 class="text-base font-semibold text-slate-900">No audit events matched</h3>
+                <h3 class="text-base font-semibold text-[var(--color-text)]">No audit events matched</h3>
                 <p class="text-sm muted">Change the search or action filter.</p>
               </div>
             </td>
@@ -72,7 +72,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
     </table>
   </div>
 
-  <div class="flex items-center justify-between text-sm text-slate-600">
+  <div class="flex items-center justify-between text-sm muted">
     <p>Total: {{ .Total }} records</p>
     <div class="flex items-center gap-2">
       {{ if .HasPrevPage }}

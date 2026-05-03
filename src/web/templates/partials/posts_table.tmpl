@@ -63,7 +63,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
   </form>
 
   <div class="table-wrap">
-    <table class="data-table min-w-[860px] divide-y divide-slate-200">
+    <table class="data-table min-w-[860px] divide-y divide-[var(--color-border)]">
       <thead class="table-header">
         <tr>
           <th class="px-4 py-3 text-left font-medium">Title</th>
@@ -74,7 +74,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
           <th class="px-4 py-3 text-left font-medium">Actions</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-slate-100">
+      <tbody class="divide-y divide-[var(--color-border)]">
         {{ if .Posts }}
           {{ range .Posts }}
             {{ template "partial-post-row" . }}
@@ -83,7 +83,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
           <tr>
             <td colspan="6" class="px-4 py-8">
               <div class="empty-state">
-                <h3 class="text-base font-semibold text-slate-900">No content matched</h3>
+                <h3 class="text-base font-semibold text-[var(--color-text)]">No content matched</h3>
                 <p class="text-sm muted">Adjust the filters or create a new post.</p>
                 <a href="/admin/posts/new" class="btn btn-primary focus-ring">New Post</a>
               </div>
@@ -94,7 +94,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
     </table>
   </div>
 
-  <div class="flex items-center justify-between text-sm text-slate-600">
+  <div class="flex items-center justify-between text-sm muted">
     <p>Total: {{ .Total }} records</p>
     <div class="flex items-center gap-2">
       {{ if .HasPrevPage }}
@@ -112,11 +112,11 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 {{ define "partial-post-row" }}
 {{ $post := . }}
 <tr id="row-{{ $post.ID }}" class="align-top">
-  <td class="px-4 py-3 font-medium text-slate-900">{{ $post.Title }}</td>
-  <td class="px-4 py-3 text-slate-700">{{ $post.Slug }}</td>
-  <td class="px-4 py-3 text-slate-700">{{ $post.Type }}</td>
-  <td class="px-4 py-3 text-slate-700">{{ $post.Status }}</td>
-  <td class="px-4 py-3 text-slate-500">{{ $post.UpdatedAt.Format "2006-01-02 15:04" }}</td>
+  <td class="px-4 py-3 font-medium text-[var(--color-text)]">{{ $post.Title }}</td>
+  <td class="px-4 py-3 text-[var(--color-text)]">{{ $post.Slug }}</td>
+  <td class="px-4 py-3 text-[var(--color-text)]">{{ $post.Type }}</td>
+  <td class="px-4 py-3 text-[var(--color-text)]">{{ $post.Status }}</td>
+  <td class="px-4 py-3 muted">{{ $post.UpdatedAt.Format "2006-01-02 15:04" }}</td>
   <td class="px-4 py-3">
     <div class="flex flex-wrap gap-2">
       <a class="btn btn-secondary btn-xs focus-ring" href="/admin/posts/{{ $post.ID }}/edit">Edit</a>
@@ -134,7 +134,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 
 {{ define "partial-post-row-edit" }}
 {{ $post := .Post }}
-<tr id="row-{{ $post.ID }}" class="bg-slate-50">
+<tr id="row-{{ $post.ID }}" class="bg-[var(--color-surface-muted)]">
   <td colspan="6" class="px-4 py-3">
     {{ if .Errors }}
       <div class="flash-error mb-3">
