@@ -35,11 +35,13 @@ build_dev_image() {
 		docker buildx build --load \
 			${DOCKER_BUILD_EXTRA_ARGS} \
 			--build-arg DEV_BASE_IMAGE="${DEV_GO_IMAGE_LOCK:-${DEV_GO_IMAGE}}" \
+			--build-arg DEV_NODE_IMAGE="${DEV_NODE_IMAGE_LOCK:-${DEV_NODE_IMAGE}}" \
 			-f Dockerfile \
 			-t "${app_image}" .
 	else
 		docker build \
 			--build-arg DEV_BASE_IMAGE="${DEV_GO_IMAGE_LOCK:-${DEV_GO_IMAGE}}" \
+			--build-arg DEV_NODE_IMAGE="${DEV_NODE_IMAGE_LOCK:-${DEV_NODE_IMAGE}}" \
 			-f Dockerfile \
 			-t "${app_image}" .
 	fi
