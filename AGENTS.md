@@ -125,6 +125,35 @@ Use lowercase, ASCII-only kebab-case branch names with this pattern:
 <type>/<optional-issue>-<short-kebab-summary>
 ```
 
+Use these branch type prefixes:
+
+- `feat/` for user-visible features or capabilities.
+- `fix/` for bug fixes or broken workflow repairs.
+- `docs/` for documentation-only changes.
+- `ci/` for GitHub Actions, checks, or automation behavior.
+- `deps/` for dependency, tool, image, or lockfile updates.
+- `security/` for security hardening or vulnerability remediation.
+- `release/` for release preparation.
+- `infra/` for repository infrastructure changes.
+- `refactor/` for behavior-preserving cleanup.
+- `test/` for test-only or validation-only changes.
+- `chore/` for maintenance that does not fit a narrower type.
+
+Examples:
+
+```text
+docs/gitops-branch-guidance
+fix/42-smoke-run-css-assets
+ci/pin-workflow-action-shas
+deps/update-renovate-config
+security/harden-admin-session-cookies
+```
+
+Prefer one logical change per branch. Include an issue number only when it
+exists and improves traceability. Keep desired state in repository files rather
+than encoding behavior in branch names, and treat branch names as untrusted
+input in workflows.
+
 ## Review
 
 When reviewing changes or using `/review`:
