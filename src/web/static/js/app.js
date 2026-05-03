@@ -226,6 +226,14 @@ document.body.addEventListener("click", function (event) {
   if (!value) {
     return;
   }
+  if (button.closest("[data-enrollment-link]")) {
+    try {
+      var url = new URL(value, window.location.origin);
+      value = window.location.origin + url.pathname + url.search + url.hash;
+    } catch (error) {
+      return;
+    }
+  }
 
   var originalText = button.textContent;
   setBusy(button, true);
@@ -255,7 +263,6 @@ function setBusy(control, busy) {
   control.disabled = busy;
   control.setAttribute("aria-busy", busy ? "true" : "false");
 }
-
 function bindPasskeyLogin() {
   var button = document.querySelector("[data-passkey-login]");
   if (!button) {

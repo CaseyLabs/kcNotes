@@ -225,3 +225,57 @@ func usersHandlerStack(store *storesqlite.AuthStore, next http.Handler) http.Han
 		CookiePath: "/admin",
 	})(next)))
 }
+
+func TestEnrollmentPathFromQueryAllowsOnlyServerEnrollmentPaths(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{
+			name:  "relative enrollment token path",
+			value: "/admin/enroll?token=abc",
+			want:  "/admin/enroll?token=abc",
+		},
+		{
+			name:  "encoded token path",
+			value: "/admin/enroll?token=abc%2B123",
+			want:  "/admin/enroll?token=abc%2B123",
+		},
+		{
+			name:  "absolute external URL",
+			value: "https://evil.example/admin/enroll?token=abc",
+		},
+		{
+			name:  "scheme relative external URL",
+			value: "//evil.example/admin/enroll?token=abc",
+		},
+		{
+			name:  "wrong path",
+			value: "/login?token=abc",
+		},
+		{
+			name:  "missing token",
+			value: "/admin/enroll",
+		},
+		{
+			name:  "extra query parameter",
+			value: "/admin/enroll?token=abc&next=https%3A%2F%2Fevil.example",
+		},
+		{
+			name:  "fragment",
+			value: "/admin/enroll?token=abc#copy",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := enrollmentPathFromQuery(tt.value); got != tt.want {
+				t.Fatalf("enrollmentPathFromQuery(%q) = %q, want %q", tt.value, got, tt.want)
+			}
+		})
+	}
+}

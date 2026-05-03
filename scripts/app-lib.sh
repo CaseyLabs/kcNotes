@@ -89,6 +89,7 @@ run_in_dev_container() {
 		-e WEBAUTHN_RP_ID \
 		-e WEBAUTHN_RP_NAME \
 		-e WEBAUTHN_ORIGINS \
+		-e WEBAUTHN_ATTESTATION \
 		-v "${docker_home_source}:${docker_home}" \
 		-v "${docker_tmpdir}:/tmp" \
 		-v "$(pwd):/workspace" \
@@ -173,6 +174,7 @@ run_web_container() {
 		-e WEBAUTHN_RP_ID \
 		-e WEBAUTHN_RP_NAME \
 		-e WEBAUTHN_ORIGINS \
+		-e WEBAUTHN_ATTESTATION \
 		-v "${docker_home_source}:${docker_home}" \
 		-v "${docker_tmpdir}:/tmp" \
 		-v "$(pwd):/workspace" \

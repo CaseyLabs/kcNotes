@@ -187,8 +187,24 @@ func (h *Admin) usersData(r *http.Request, currentUser domain.User, users []doma
 		"CreateFormErrors": errs,
 		"CurrentUserID":    currentUser.ID,
 		"FlashMessage":     strings.TrimSpace(r.URL.Query().Get("msg")),
-		"EnrollmentLink":   strings.TrimSpace(r.URL.Query().Get("enrollment_link")),
+		"EnrollmentLink":   enrollmentPathFromQuery(r.URL.Query().Get("enrollment_link")),
 	}
+}
+
+func enrollmentPathFromQuery(value string) string {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return ""
+	}
+	if parsed.IsAbs() || parsed.Host != "" || parsed.Path != "/admin/enroll" || parsed.Fragment != "" {
+		return ""
+	}
+	query := parsed.Query()
+	token := strings.TrimSpace(query.Get("token"))
+	if token == "" || len(query) != 1 || len(query["token"]) != 1 {
+		return ""
+	}
+	return parsed.String()
 }
 
 // renderUsersTableError explains one unit of behavior in this package.
