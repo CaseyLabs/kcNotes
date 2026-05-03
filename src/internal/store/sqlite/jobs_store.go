@@ -173,33 +173,59 @@ func (s *AuthStore) ClaimDueJob(ctx context.Context, now time.Time, staleAfter t
 }
 
 // CompleteJob marks a running job as successful and re-schedules it.
-func (s *AuthStore) CompleteJob(ctx context.Context, id string, nextRunAt time.Time) error {
-	_, err := s.db.ExecContext(ctx, `
+func (s *AuthStore) CompleteJob(ctx context.Context, job Job, nextRunAt time.Time) error {
+	if job.ID == "" {
+		return fmt.Errorf("complete job: job id is required")
+	}
+	if job.LockedAt == nil {
+		return fmt.Errorf("complete job: lock ownership is required")
+	}
+	res, err := s.db.ExecContext(ctx, `
 		UPDATE jobs
 		SET status = ?, attempts = 0, run_at = ?, locked_at = NULL, last_error = NULL, last_finished_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-		WHERE id = ?
-	`, JobStatusPending, nextRunAt.UTC().Format(time.RFC3339Nano), time.Now().UTC().Format(time.RFC3339Nano), id)
+		WHERE id = ? AND status = ? AND locked_at = ?
+	`, JobStatusPending, nextRunAt.UTC().Format(time.RFC3339Nano), time.Now().UTC().Format(time.RFC3339Nano), job.ID, JobStatusRunning, job.LockedAt.UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return fmt.Errorf("complete job: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("complete job rows: %w", err)
+	}
+	if rows == 0 {
+		return ErrConflict
 	}
 	return nil
 }
 
 // FailJob re-schedules the job or marks it failed when max attempts is exceeded.
 func (s *AuthStore) FailJob(ctx context.Context, job Job, now time.Time, retryAfter time.Duration, errMsg string) error {
+	if job.ID == "" {
+		return fmt.Errorf("fail job: job id is required")
+	}
+	if job.LockedAt == nil {
+		return fmt.Errorf("fail job: lock ownership is required")
+	}
 	status := JobStatusPending
 	nextRun := now.UTC().Add(retryAfter)
 	if job.Attempts >= job.MaxAttempts {
 		status = JobStatusFailed
 		nextRun = now.UTC()
 	}
-	_, err := s.db.ExecContext(ctx, `
+	res, err := s.db.ExecContext(ctx, `
 		UPDATE jobs
 		SET status = ?, run_at = ?, locked_at = NULL, last_error = ?, last_finished_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-		WHERE id = ?
-	`, status, nextRun.Format(time.RFC3339Nano), errMsg, now.UTC().Format(time.RFC3339Nano), job.ID)
+		WHERE id = ? AND status = ? AND locked_at = ?
+	`, status, nextRun.Format(time.RFC3339Nano), errMsg, now.UTC().Format(time.RFC3339Nano), job.ID, JobStatusRunning, job.LockedAt.UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return fmt.Errorf("fail job: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("fail job rows: %w", err)
+	}
+	if rows == 0 {
+		return ErrConflict
 	}
 	return nil
 }

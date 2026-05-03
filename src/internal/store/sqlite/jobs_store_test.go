@@ -50,7 +50,7 @@ func TestJobsStoreEnsureClaimAndComplete(t *testing.T) {
 	}
 
 	nextRun := time.Now().UTC().Add(time.Hour)
-	mustNoErr(t, store.CompleteJob(ctx, job.ID, nextRun))
+	mustNoErr(t, store.CompleteJob(ctx, job, nextRun))
 
 	pending, running, err := store.JobQueueCounts(ctx)
 	mustNoErr(t, err)
@@ -199,6 +199,103 @@ func TestClaimDueJobReclaimsStaleRunningJob(t *testing.T) {
 	}
 	if reclaimed.Attempts != 2 {
 		t.Fatalf("expected attempts incremented on reclaim, got %d", reclaimed.Attempts)
+	}
+}
+
+func TestCompleteJobRejectsStaleClaimAfterReclaim(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newJobsTestAuthStore(t)
+
+	_, err := store.EnsureJob(ctx, Job{
+		ID:          "job-stale-complete",
+		Type:        "autosave_cleanup",
+		Key:         "autosave-cleanup-stale-complete",
+		PayloadJSON: `{}`,
+		MaxAttempts: 3,
+		RunAt:       time.Now().UTC().Add(-time.Minute),
+	})
+	mustNoErr(t, err)
+
+	t0 := time.Now().UTC()
+	firstClaim, ok, err := store.ClaimDueJob(ctx, t0, 5*time.Minute)
+	mustNoErr(t, err)
+	if !ok {
+		t.Fatalf("expected first claim to succeed")
+	}
+
+	_, ok, err = store.ClaimDueJob(ctx, t0.Add(6*time.Minute), 5*time.Minute)
+	mustNoErr(t, err)
+	if !ok {
+		t.Fatalf("expected second claim to reclaim stale running job")
+	}
+
+	err = store.CompleteJob(ctx, firstClaim, t0.Add(time.Hour))
+	if err != ErrConflict {
+		t.Fatalf("expected ErrConflict from stale complete, got %v", err)
+	}
+
+	var status string
+	var attempts int
+	err = store.db.QueryRowContext(ctx, `SELECT status, attempts FROM jobs WHERE id = ?`, firstClaim.ID).Scan(&status, &attempts)
+	mustNoErr(t, err)
+	if status != JobStatusRunning {
+		t.Fatalf("expected job to remain running after stale complete, got %q", status)
+	}
+	if attempts != 2 {
+		t.Fatalf("expected attempts to remain 2 after reclaim, got %d", attempts)
+	}
+}
+
+func TestFailJobRejectsStaleClaimAfterReclaim(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newJobsTestAuthStore(t)
+
+	_, err := store.EnsureJob(ctx, Job{
+		ID:          "job-stale-fail",
+		Type:        "autosave_cleanup",
+		Key:         "autosave-cleanup-stale-fail",
+		PayloadJSON: `{}`,
+		MaxAttempts: 3,
+		RunAt:       time.Now().UTC().Add(-time.Minute),
+	})
+	mustNoErr(t, err)
+
+	t0 := time.Now().UTC()
+	firstClaim, ok, err := store.ClaimDueJob(ctx, t0, 5*time.Minute)
+	mustNoErr(t, err)
+	if !ok {
+		t.Fatalf("expected first claim to succeed")
+	}
+
+	_, ok, err = store.ClaimDueJob(ctx, t0.Add(6*time.Minute), 5*time.Minute)
+	mustNoErr(t, err)
+	if !ok {
+		t.Fatalf("expected second claim to reclaim stale running job")
+	}
+
+	err = store.FailJob(ctx, firstClaim, t0.Add(7*time.Minute), 30*time.Second, "stale failure")
+	if err != ErrConflict {
+		t.Fatalf("expected ErrConflict from stale fail, got %v", err)
+	}
+
+	var status, lastError string
+	var attempts int
+	err = store.db.QueryRowContext(ctx, `
+		SELECT status, attempts, COALESCE(last_error, '')
+		FROM jobs
+		WHERE id = ?
+	`, firstClaim.ID).Scan(&status, &attempts, &lastError)
+	mustNoErr(t, err)
+	if status != JobStatusRunning {
+		t.Fatalf("expected job to remain running after stale fail, got %q", status)
+	}
+	if attempts != 2 {
+		t.Fatalf("expected attempts to remain 2 after reclaim, got %d", attempts)
+	}
+	if lastError != "" {
+		t.Fatalf("expected stale fail to not overwrite last_error, got %q", lastError)
 	}
 }
 

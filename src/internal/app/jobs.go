@@ -103,7 +103,7 @@ func (a *App) runJobsOnce(ctx context.Context) {
 	}
 
 	a.jobsMetrics.successTotal.Add(1)
-	if err := a.jobStore.CompleteJob(ctx, job.ID, now.Add(a.autosaveCleanupEvery)); err != nil {
+	if err := a.jobStore.CompleteJob(ctx, job, now.Add(a.autosaveCleanupEvery)); err != nil {
 		a.logger.Error("complete job", "job_type", job.Type, "job_key", job.Key, "error", err)
 	}
 }
