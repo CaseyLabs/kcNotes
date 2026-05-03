@@ -63,8 +63,16 @@ func (s *AuthStore) EnsureJob(ctx context.Context, job Job) (bool, error) {
 		res, err = s.db.ExecContext(ctx, `
 			INSERT INTO jobs(id, job_type, job_key, payload_json, status, attempts, max_attempts, run_at, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, 0, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-			ON CONFLICT(job_key) DO NOTHING
-		`, job.ID, job.Type, job.Key, job.PayloadJSON, JobStatusPending, job.MaxAttempts, job.RunAt.UTC().Format(time.RFC3339Nano))
+			ON CONFLICT(job_key) DO UPDATE SET
+				status = excluded.status,
+				attempts = 0,
+				max_attempts = excluded.max_attempts,
+				run_at = excluded.run_at,
+				locked_at = NULL,
+				last_error = NULL,
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			WHERE jobs.status = ?
+		`, job.ID, job.Type, job.Key, job.PayloadJSON, JobStatusPending, job.MaxAttempts, job.RunAt.UTC().Format(time.RFC3339Nano), JobStatusFailed)
 		return err
 	})
 	if err != nil {

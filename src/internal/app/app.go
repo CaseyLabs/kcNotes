@@ -118,8 +118,11 @@ func (a *App) Publish(ctx context.Context) (publish.Result, error) {
 // Router explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func (a *App) Router() *routes.Router {
-	authStore := storesqlite.NewAuthStore(a.db)
-	a.jobStore = authStore
+	authStore := a.jobStore
+	if authStore == nil {
+		authStore = storesqlite.NewAuthStore(a.db)
+		a.jobStore = authStore
+	}
 	webAuthn, err := auth.NewWebAuthn(auth.WebAuthnConfig{
 		RPID:        a.cfg.WebAuthnRPID,
 		RPName:      a.cfg.WebAuthnRPName,

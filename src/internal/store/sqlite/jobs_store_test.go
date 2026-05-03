@@ -103,6 +103,64 @@ func TestFailJobMarksFailedAtMaxAttempts(t *testing.T) {
 	}
 }
 
+func TestEnsureJobRearmsFailedJob(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newJobsTestAuthStore(t)
+
+	_, err := store.EnsureJob(ctx, Job{
+		ID:          "job-rearm-initial",
+		Type:        "autosave_cleanup",
+		Key:         "autosave-cleanup-rearm",
+		PayloadJSON: `{}`,
+		MaxAttempts: 1,
+		RunAt:       time.Now().UTC().Add(-time.Minute),
+	})
+	mustNoErr(t, err)
+
+	job, ok, err := store.ClaimDueJob(ctx, time.Now().UTC(), 5*time.Minute)
+	mustNoErr(t, err)
+	if !ok {
+		t.Fatalf("expected due job to be claimed")
+	}
+	mustNoErr(t, store.FailJob(ctx, job, time.Now().UTC(), 30*time.Second, "boom"))
+
+	changed, err := store.EnsureJob(ctx, Job{
+		ID:          "job-rearm-second",
+		Type:        "autosave_cleanup",
+		Key:         "autosave-cleanup-rearm",
+		PayloadJSON: `{}`,
+		MaxAttempts: 3,
+		RunAt:       time.Now().UTC(),
+	})
+	mustNoErr(t, err)
+	if !changed {
+		t.Fatalf("expected ensure to revive existing failed job")
+	}
+
+	var status, lastErr string
+	var attempts, maxAttempts int
+	err = store.db.QueryRowContext(ctx, `
+		SELECT status, attempts, max_attempts, COALESCE(last_error, '')
+		FROM jobs
+		WHERE job_key = ?
+	`, "autosave-cleanup-rearm").Scan(&status, &attempts, &maxAttempts, &lastErr)
+	mustNoErr(t, err)
+
+	if status != JobStatusPending {
+		t.Fatalf("expected revived job status pending, got %q", status)
+	}
+	if attempts != 0 {
+		t.Fatalf("expected revived job attempts reset to 0, got %d", attempts)
+	}
+	if maxAttempts != 3 {
+		t.Fatalf("expected revived job max_attempts updated to 3, got %d", maxAttempts)
+	}
+	if lastErr != "" {
+		t.Fatalf("expected revived job last_error to be cleared, got %q", lastErr)
+	}
+}
+
 func TestClaimDueJobReclaimsStaleRunningJob(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
