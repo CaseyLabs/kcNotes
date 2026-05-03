@@ -35,11 +35,32 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      # Buildx enables Docker layer cache export/import for the scan image.
-      - name: Set up Docker build cache
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+      - name: Detect workflow changes
+        id: changes
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -eu
+
+          base_sha="${BASE_SHA:-${BEFORE_SHA:-}}"
+          if [ -z "${base_sha}" ] || printf '%s' "${base_sha}" | grep -Eq '^0+$'; then
+            printf 'workflow_checks=true\n' >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          if ! git cat-file -e "${base_sha}^{commit}" 2>/dev/null; then
+            printf 'workflow_checks=true\n' >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          changed_files=$(git diff --name-only "${base_sha}" "${GITHUB_SHA}")
+          if printf '%s\n' "${changed_files}" | grep -Eq '^\.github/workflows/.*\.yml$'; then
+            printf 'workflow_checks=true\n' >> "${GITHUB_OUTPUT}"
+          else
+            printf 'workflow_checks=false\n' >> "${GITHUB_OUTPUT}"
+          fi
       - name: Run secret and workflow scans
         env:
-          # scripts/scan.sh reads this variable and passes it to docker buildx.
-          DOCKER_BUILD_EXTRA_ARGS: --cache-from type=gha,scope=project-image --cache-to type=gha,scope=project-image,mode=max
+          SCAN_WORKFLOW_CHECKS: ${{ steps.changes.outputs.workflow_checks }}
         run: PROJECT_CFG_FILE=config/project.cfg make scan

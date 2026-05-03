@@ -33,12 +33,69 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          fetch-depth: 0
           persist-credentials: false
+      - name: Detect source changes
+        id: changes
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -eu
+
+          base_sha="${BASE_SHA:-${BEFORE_SHA:-}}"
+          if [ -z "${base_sha}" ] || printf '%s' "${base_sha}" | grep -Eq '^0+$'; then
+            printf 'run_tests=true\n' >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          if ! git cat-file -e "${base_sha}^{commit}" 2>/dev/null; then
+            printf 'run_tests=true\n' >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          changed_files=$(git diff --name-only "${base_sha}" "${GITHUB_SHA}")
+          if [ -z "${changed_files}" ]; then
+            printf 'run_tests=true\n' >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          run_tests=false
+          printf '%s\n' "${changed_files}" | while IFS= read -r path; do
+            case "${path}" in
+              README.md | docs/* | .github/*) ;;
+              *)
+                printf 'run_tests=true\n' >> "${GITHUB_OUTPUT}"
+                exit 0
+                ;;
+            esac
+          done
+
+          if ! grep -q '^run_tests=true$' "${GITHUB_OUTPUT}"; then
+            printf '%s\n' "Docs/workflow-only changes detected; skipping source tests."
+            printf '%s\n' "run_tests=${run_tests}" >> "${GITHUB_OUTPUT}"
+          fi
       # Buildx enables GitHub Actions cache import/export for Docker layers.
       - name: Set up Docker build cache
+        if: steps.changes.outputs.run_tests == 'true'
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+      - name: Restore source caches
+        if: steps.changes.outputs.run_tests == 'true'
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            .cache/go-build
+            .cache/go-mod
+            .cache/npm
+          key: kcnotes-src-${{ runner.os }}-${{ hashFiles('src/go.sum', 'src/package-lock.json', 'Dockerfile', 'config/project.cfg') }}
+          restore-keys: |
+            kcnotes-src-${{ runner.os }}-
       - name: Run source tests and build
+        if: steps.changes.outputs.run_tests == 'true'
         env:
           # scripts/build.sh reads this variable and passes it to docker buildx.
-          DOCKER_BUILD_EXTRA_ARGS: --cache-from type=gha,scope=src-image --cache-to type=gha,scope=src-image,mode=max
+          DOCKER_BUILD_EXTRA_ARGS: --cache-from type=gha,scope=kcnotes-dev-image --cache-to type=gha,scope=kcnotes-dev-image,mode=max
         run: PROJECT_CFG_FILE=config/project.cfg make test
+      - name: Skip source tests
+        if: steps.changes.outputs.run_tests != 'true'
+        run: printf '%s\n' 'No source-impacting changes detected.'

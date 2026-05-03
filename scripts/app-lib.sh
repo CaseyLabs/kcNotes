@@ -209,5 +209,5 @@ wait_for_http_ok() {
 }
 
 build_css_command() {
-	printf "%s" "cd src && mkdir -p /workspace/.cache && npm ci --no-fund --no-audit && BROWSERSLIST_IGNORE_OLD_DATA=1 npm run build:css"
+	printf "%s" "./scripts/npm-install-if-needed.sh src && cd src && BROWSERSLIST_IGNORE_OLD_DATA=1 npm run build:css"
 }

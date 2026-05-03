@@ -9,34 +9,46 @@ case "${project_cfg_file}" in
 esac
 
 [ -f "${project_cfg_file}" ] || {
-  printf 'missing %s; set PROJECT_CFG_FILE to an existing config file\n' "${project_cfg_file}" >&2
-  exit 1
+	printf 'missing %s; set PROJECT_CFG_FILE to an existing config file\n' "${project_cfg_file}" >&2
+	exit 1
 }
 
 # shellcheck disable=SC1090
 . "${project_cfg_file}"
 
 fail_if_file_has_content() {
-  output_file=$1
-  help_message=$2
-  if [ -s "${output_file}" ]; then
-    cat "${output_file}"
-    echo "${help_message}"
-    exit 1
-  fi
+	output_file=$1
+	help_message=$2
+	if [ -s "${output_file}" ]; then
+		cat "${output_file}"
+		echo "${help_message}"
+		exit 1
+	fi
 }
 
 mkdir -p /workspace/.cache/bin
 export PATH=/workspace/.cache/bin:/usr/local/go/bin:"${PATH}"
 export GOFLAGS='-tags=sqlite_fts5'
 
-echo '[lint] Installing pinned lint/format tools'
-GOBIN=/workspace/.cache/bin go install "mvdan.cc/sh/v3/cmd/shfmt@${DEV_LINT_SHFMT_VERSION}"
-GOBIN=/workspace/.cache/bin go install "honnef.co/go/tools/cmd/staticcheck@${DEV_LINT_STATICCHECK_VERSION}"
-GOBIN=/workspace/.cache/bin go install "github.com/checkmake/checkmake/cmd/checkmake@${DEV_LINT_CHECKMAKE_VERSION}"
+ensure_go_tool() {
+	tool_name=$1
+	tool_package=$2
+	tool_version=$3
+	marker="/workspace/.cache/bin/.${tool_name}.version"
 
+	if [ ! -x "/workspace/.cache/bin/${tool_name}" ] || [ ! -f "${marker}" ] || [ "$(cat "${marker}")" != "${tool_version}" ]; then
+		printf '[lint] Installing %s %s\n' "${tool_name}" "${tool_version}"
+		GOBIN=/workspace/.cache/bin go install "${tool_package}@${tool_version}"
+		printf '%s\n' "${tool_version}" >"${marker}"
+	fi
+}
+
+ensure_go_tool shfmt mvdan.cc/sh/v3/cmd/shfmt "${DEV_LINT_SHFMT_VERSION}"
+ensure_go_tool staticcheck honnef.co/go/tools/cmd/staticcheck "${DEV_LINT_STATICCHECK_VERSION}"
+ensure_go_tool checkmake github.com/checkmake/checkmake/cmd/checkmake "${DEV_LINT_CHECKMAKE_VERSION}"
+
+/workspace/scripts/npm-install-if-needed.sh /workspace/src
 cd /workspace/src
-npm ci --no-fund --no-audit --silent
 
 echo '[fmt-check] gofmt'
 GOFMT_OUT=/tmp/gofmt.out
@@ -45,11 +57,11 @@ fail_if_file_has_content "${GOFMT_OUT}" 'Run: gofmt -w <files>'
 
 echo '[fmt-check] prettier'
 find . -type f \
-  \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.yml' -o -name '*.yaml' \) \
-  -not -path './node_modules/*' \
-  -not -path './web/static/css/app.css' \
-  -not -path './web/static/js/vendor/*' \
-  -print0 | xargs -0 -r npx --yes "prettier@${DEV_LINT_PRETTIER_VERSION}" --check
+	\( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.yml' -o -name '*.yaml' \) \
+	-not -path './node_modules/*' \
+	-not -path './web/static/css/app.css' \
+	-not -path './web/static/js/vendor/*' \
+	-print0 | xargs -0 -r npx --yes "prettier@${DEV_LINT_PRETTIER_VERSION}" --check
 npx --yes "prettier@${DEV_LINT_PRETTIER_VERSION}" --check README.md 2>/dev/null || true
 
 echo '[lint] go vet'
@@ -65,9 +77,9 @@ find scripts -type f -name '*.sh' -print0 | xargs -0 -r shellcheck -x -e SC1091
 echo '[lint] jshint'
 cd /workspace/src
 find . -type f -name '*.js' \
-  -not -path './node_modules/*' \
-  -not -path './web/static/js/vendor/*' \
-  -print0 | xargs -0 -r npx --yes "jshint@${DEV_LINT_JSHINT_VERSION}"
+	-not -path './node_modules/*' \
+	-not -path './web/static/js/vendor/*' \
+	-print0 | xargs -0 -r npx --yes "jshint@${DEV_LINT_JSHINT_VERSION}"
 
 echo '[lint] markdownlint'
 cd /workspace
