@@ -10,16 +10,19 @@ import (
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/google/uuid"
 
 	"kcnotes/internal/domain"
 )
 
 type WebAuthnConfig struct {
-	RPID        string
-	RPName      string
-	RPOrigins   []string
-	SiteBaseURL string
-	AppEnv      string
+	RPID           string
+	RPName         string
+	RPOrigins      []string
+	SiteBaseURL    string
+	AppEnv         string
+	Attestation    string
+	AllowedAAGUIDs []string
 }
 
 func NewWebAuthn(cfg WebAuthnConfig) (*webauthn.WebAuthn, error) {
@@ -45,11 +48,54 @@ func NewWebAuthn(cfg WebAuthnConfig) (*webauthn.WebAuthn, error) {
 	if rpID == "" || len(origins) == 0 {
 		return nil, fmt.Errorf("WEBAUTHN_RP_ID and WEBAUTHN_ORIGINS are required outside dev when SITE_BASE_URL is empty")
 	}
-	return webauthn.New(&webauthn.Config{
-		RPID:          rpID,
-		RPDisplayName: rpName,
-		RPOrigins:     origins,
-	})
+	attestation, err := parseAttestationConveyance(cfg.Attestation)
+	if err != nil {
+		return nil, err
+	}
+	allowedAAGUIDs, err := parseAllowedAAGUIDs(cfg.AllowedAAGUIDs)
+	if err != nil {
+		return nil, err
+	}
+	webAuthnConfig := &webauthn.Config{
+		RPID:                  rpID,
+		RPDisplayName:         rpName,
+		RPOrigins:             origins,
+		AttestationPreference: attestation,
+	}
+	if len(allowedAAGUIDs) > 0 {
+		webAuthnConfig.Filtering = &webauthn.FilteringConfig{PermittedAAGUIDs: allowedAAGUIDs}
+	}
+	return webauthn.New(webAuthnConfig)
+}
+
+func parseAttestationConveyance(value string) (protocol.ConveyancePreference, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "none":
+		return protocol.PreferNoAttestation, nil
+	case "indirect":
+		return protocol.PreferIndirectAttestation, nil
+	case "direct":
+		return protocol.PreferDirectAttestation, nil
+	case "enterprise":
+		return protocol.PreferEnterpriseAttestation, nil
+	default:
+		return "", fmt.Errorf("invalid WEBAUTHN_ATTESTATION_CONVEYANCE %q: expected none, indirect, direct, or enterprise", value)
+	}
+}
+
+func parseAllowedAAGUIDs(values []string) ([]uuid.UUID, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	ids := make([]uuid.UUID, 0, len(values))
+	for _, value := range values {
+		id, err := uuid.Parse(strings.TrimSpace(value))
+		if err != nil {
+			return nil, fmt.Errorf("invalid WEBAUTHN_ALLOWED_AAGUIDS value %q: %w", value, err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 type WebAuthnUser struct {
