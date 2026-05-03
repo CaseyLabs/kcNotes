@@ -169,8 +169,16 @@ sqlite3 "$DB_FILE" <<SQL
 INSERT INTO users(id, email, password_hash, role, disabled)
 VALUES ('$USER_ID', '$EMAIL', '', 'admin', 1);
 
-INSERT INTO user_enrollment_invitations(id, user_id, token_hash, expires_at, created_by)
-VALUES ('$INVITE_ID', '$USER_ID', '$TOKEN_HASH', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+7 days'), '$CREATED_BY');
+INSERT INTO user_enrollment_invitations(
+  id, user_id, token_hash, expires_at, created_by
+)
+VALUES (
+  '$INVITE_ID',
+  '$USER_ID',
+  '$TOKEN_HASH',
+  strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+7 days'),
+  '$CREATED_BY'
+);
 SQL
 
 printf 'Open /admin/enroll?token=%s\n' "$TOKEN"
