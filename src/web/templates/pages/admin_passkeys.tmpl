@@ -20,7 +20,7 @@
     </form>
 
     <section class="table-wrap">
-      <table class="data-table min-w-[760px] divide-y divide-slate-200">
+      <table class="data-table min-w-[760px] divide-y divide-[var(--color-border)]">
         <thead class="table-header">
           <tr>
             <th class="px-4 py-3 text-left font-medium">Name</th>
@@ -29,12 +29,12 @@
             <th class="px-4 py-3 text-left font-medium">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-100">
+        <tbody class="divide-y divide-[var(--color-border)]">
           {{ range .Passkeys }}
           <tr>
-            <td class="px-4 py-3 text-slate-900">{{ if .Nickname }}{{ .Nickname }}{{ else }}Passkey{{ end }}</td>
-            <td class="px-4 py-3 text-slate-700">{{ if .BackupState }}yes{{ else }}no{{ end }}</td>
-            <td class="px-4 py-3 text-slate-700">{{ if .LastUsedAt }}{{ .LastUsedAt }}{{ else }}never{{ end }}</td>
+            <td class="px-4 py-3 text-[var(--color-text)]">{{ if .Nickname }}{{ .Nickname }}{{ else }}Passkey{{ end }}</td>
+            <td class="px-4 py-3 text-[var(--color-text)]">{{ if .BackupState }}yes{{ else }}no{{ end }}</td>
+            <td class="px-4 py-3 text-[var(--color-text)]">{{ if .LastUsedAt }}{{ .LastUsedAt }}{{ else }}never{{ end }}</td>
             <td class="px-4 py-3">
               <div class="flex flex-wrap gap-2">
                 <form class="flex gap-2" method="post" action="/admin/passkeys/{{ .ID }}/rename">
@@ -50,7 +50,7 @@
             </td>
           </tr>
           {{ else }}
-          <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500">No passkeys yet.</td></tr>
+          <tr><td colspan="4" class="px-4 py-8 text-center muted">No passkeys yet.</td></tr>
           {{ end }}
         </tbody>
       </table>
