@@ -49,6 +49,10 @@ func main() {
 	case "serve":
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
+		if err := application.StartBackgroundJobs(ctx); err != nil {
+			logger.Error("start background jobs", "error", err)
+			os.Exit(1)
+		}
 
 		srv := &http.Server{
 			Addr:              cfg.HTTPAddr,

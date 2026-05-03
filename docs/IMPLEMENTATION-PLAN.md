@@ -328,10 +328,18 @@ hardware-key-only enrollment. No attestation enforcement is active by default.
 
 ### O3: Jobs Table and Runner
 
-- `jobs` table with unique `job_key`.
-- Internal runner with retry/attempt tracking.
-- Use for stale autosave cleanup, media processing, publish workflows, or other
-  deferred work.
+O3 is partially implemented for the first production workload.
+
+- `jobs` table exists with unique `job_key`, due-job indexes, and lock-state
+  indexes.
+- Internal serve-mode runner claims due jobs, tracks attempts, and retries
+  failed runs with backoff before marking terminal failure.
+- Autosave snapshot cleanup runs as a recurring background job using
+  `AUTOSAVE_RETENTION_DURATION` and `AUTOSAVE_CLEANUP_INTERVAL`.
+- Minimal job metrics (run/success/failure counts plus pending/running queue
+  counts) are emitted through structured logs for operational visibility.
+- Additional O3 uses (media processing, publish workflows, and broader deferred
+  work) remain backlog.
 
 ### O4: Observability Expansion
 
