@@ -162,11 +162,16 @@ the UI refresh.
 - MIME allowlist for JPEG, PNG, and GIF.
 - Magic-byte/content detection.
 - Image decode verification.
+- JPEG/PNG uploads are re-encoded to strip metadata where practical.
+- Uploaded media records store image dimensions.
+- Synchronous thumbnail/responsive variants are generated for larger JPEG/PNG
+  uploads and stored as media variant metadata.
 - Randomized stored filenames.
 - Original filename stored only as metadata.
 - Per-user and global media quota enforcement.
 - Auth-protected media preview endpoint.
-- Static publishing copies allowlisted media into `dist/media`.
+- Static publishing copies allowlisted media originals and recorded variants
+  into `dist/media`.
 
 ### Settings
 
@@ -320,11 +325,14 @@ hardware-key-only enrollment. No attestation enforcement is active by default.
 
 ### O2: Media Processing Pipeline
 
-- EXIF stripping for uploaded images.
-- Thumbnail generation.
-- Responsive image variants.
-- Optional background job runner for media processing.
-- Variant metadata in the media model.
+The synchronous first slice is implemented.
+
+- JPEG/PNG uploads are re-encoded from decoded pixels to strip metadata where
+  practical.
+- Thumbnail and large responsive variants are generated synchronously for
+  larger JPEG/PNG uploads.
+- Variant metadata is stored in the media model and published with originals.
+- Optional background media processing remains backlog.
 
 ### O3: Jobs Table and Runner
 

@@ -13,8 +13,8 @@ container-driven workflows.
 - Self-hosted static assets and Tailwind CSS.
 - SQLite/libSQL storage with local, remote Turso, and optional replica modes.
 - Passkey-only admin auth, CSRF protection, RBAC, rate limiting, and account lockout.
-- Posts/pages with edit-form autosave recovery, media uploads, settings, audit
-  log, search, and static publishing.
+- Posts/pages with edit-form autosave recovery, media uploads with generated
+  image variants, settings, audit log, search, and static publishing.
 - Root-owned Docker, Make, GitHub Actions, security scan, dependency update,
   and release integrity workflows.
 

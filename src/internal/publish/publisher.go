@@ -271,17 +271,39 @@ func (p *Publisher) copyUploadedMedia(ctx context.Context, outDir string) ([]str
 		if !isPublishableMediaType(item.MIME) {
 			continue
 		}
-		if filepath.Base(item.StoredName) != item.StoredName {
-			continue
+		copied, err := p.copyUploadedMediaFile(mediaDir, item.StoredName)
+		if err != nil {
+			return nil, err
 		}
-		src := filepath.Join(p.cfg.UploadDir, item.StoredName)
-		dst := filepath.Join(mediaDir, item.StoredName)
-		if err := copyPath(src, dst); err != nil {
-			return nil, fmt.Errorf("copy media file %s: %w", item.StoredName, err)
+		if copied != "" {
+			files = append(files, copied)
 		}
-		files = append(files, filepath.ToSlash(filepath.Join("media", item.StoredName)))
+		for _, variant := range item.Variants {
+			if !isPublishableMediaType(variant.MIME) {
+				continue
+			}
+			copied, err := p.copyUploadedMediaFile(mediaDir, variant.StoredName)
+			if err != nil {
+				return nil, err
+			}
+			if copied != "" {
+				files = append(files, copied)
+			}
+		}
 	}
 	return files, nil
+}
+
+func (p *Publisher) copyUploadedMediaFile(mediaDir, storedName string) (string, error) {
+	if filepath.Base(storedName) != storedName {
+		return "", nil
+	}
+	src := filepath.Join(p.cfg.UploadDir, storedName)
+	dst := filepath.Join(mediaDir, storedName)
+	if err := copyPath(src, dst); err != nil {
+		return "", fmt.Errorf("copy media file %s: %w", storedName, err)
+	}
+	return filepath.ToSlash(filepath.Join("media", storedName)), nil
 }
 
 // renderTemplateToPath explains one unit of behavior in this package.

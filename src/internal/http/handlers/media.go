@@ -30,6 +30,7 @@ import (
 
 	"kcnotes/internal/domain"
 	"kcnotes/internal/http/middleware"
+	mediaprocess "kcnotes/internal/media"
 	storesqlite "kcnotes/internal/store/sqlite"
 )
 
@@ -37,6 +38,11 @@ const (
 	maxUploadSizeBytes = 10 << 20 // 10 MiB
 	defaultMediaLimit  = 200
 )
+
+var mediaVariantSpecs = []mediaprocess.VariantSpec{
+	{Name: "thumb", MaxSide: 320},
+	{Name: "large", MaxSide: 1024},
+}
 
 var allowedMediaTypes = map[string]string{
 	"image/jpeg": ".jpg",
@@ -114,45 +120,73 @@ func (h *Admin) UploadMedia(w http.ResponseWriter, r *http.Request) {
 		h.renderMediaUploadError(w, r, user, err.Error())
 		return
 	}
-	if err := h.enforceMediaQuota(r.Context(), user.ID, int64(len(data))); err != nil {
-		h.renderMediaUploadError(w, r, user, err.Error())
-		return
-	}
-
-	storedID, err := randomID()
+	normalized, err := mediaprocess.Normalize(data, mimeType)
 	if err != nil {
-		h.renderError(w, r, http.StatusServiceUnavailable, "service unavailable")
+		h.renderMediaUploadError(w, r, user, "invalid image data")
 		return
 	}
-	storedName := storedID + ext
-	if err := os.MkdirAll(h.uploadDir, 0o755); err != nil {
-		h.renderError(w, r, http.StatusInternalServerError, "failed to prepare upload directory")
+	variants, err := mediaprocess.BuildVariants(normalized, mediaVariantSpecs)
+	if err != nil {
+		h.renderMediaUploadError(w, r, user, "failed to process image")
 		return
 	}
-	targetPath := filepath.Join(h.uploadDir, storedName)
-	if err := os.WriteFile(targetPath, data, 0o644); err != nil {
-		h.renderError(w, r, http.StatusInternalServerError, "failed to store upload")
+	if err := h.enforceMediaQuota(r.Context(), user.ID, processedMediaBytes(normalized, variants)); err != nil {
+		h.renderMediaUploadError(w, r, user, err.Error())
 		return
 	}
 
 	mediaID, err := randomID()
 	if err != nil {
-		_ = os.Remove(targetPath)
 		h.renderError(w, r, http.StatusServiceUnavailable, "service unavailable")
 		return
 	}
-	sum := sha256.Sum256(data)
+	storedName := mediaID + ext
+	if err := os.MkdirAll(h.uploadDir, 0o755); err != nil {
+		h.renderError(w, r, http.StatusInternalServerError, "failed to prepare upload directory")
+		return
+	}
+	targetPath := filepath.Join(h.uploadDir, storedName)
+	writtenFiles := []string{targetPath}
+	if err := os.WriteFile(targetPath, normalized.Data, 0o644); err != nil {
+		h.renderError(w, r, http.StatusInternalServerError, "failed to store upload")
+		return
+	}
+
+	var storedVariants []domain.MediaVariant
+	for _, variant := range variants {
+		variantStoredName := mediaVariantStoredName(mediaID, variant.Name, ext)
+		variantPath := filepath.Join(h.uploadDir, variantStoredName)
+		if err := os.WriteFile(variantPath, variant.Data, 0o644); err != nil {
+			removeFiles(writtenFiles)
+			h.renderError(w, r, http.StatusInternalServerError, "failed to store media variant")
+			return
+		}
+		writtenFiles = append(writtenFiles, variantPath)
+		storedVariants = append(storedVariants, domain.MediaVariant{
+			MediaID:    mediaID,
+			Name:       variant.Name,
+			StoredName: variantStoredName,
+			MIME:       variant.MIME,
+			Size:       int64(len(variant.Data)),
+			Width:      variant.Width,
+			Height:     variant.Height,
+		})
+	}
+
+	sum := sha256.Sum256(normalized.Data)
 	item := domain.Media{
 		ID:           mediaID,
 		StoredName:   storedName,
 		OriginalName: cleanOriginalName(header.Filename),
 		MIME:         mimeType,
-		Size:         int64(len(data)),
+		Size:         int64(len(normalized.Data)),
 		SHA256:       hex.EncodeToString(sum[:]),
+		Width:        normalized.Width,
+		Height:       normalized.Height,
 		CreatedBy:    user.ID,
 	}
-	if err := h.store.CreateMedia(r.Context(), item); err != nil {
-		_ = os.Remove(targetPath)
+	if err := h.store.CreateMediaWithVariants(r.Context(), item, storedVariants); err != nil {
+		removeFiles(writtenFiles)
 		h.renderError(w, r, http.StatusInternalServerError, "failed to save media metadata")
 		return
 	}
@@ -294,6 +328,24 @@ func detectAndValidateMedia(data []byte) (mimeType, ext string, err error) {
 func isAllowedMediaType(mimeType string) bool {
 	_, ok := allowedMediaTypes[mimeType]
 	return ok
+}
+
+func mediaVariantStoredName(mediaID, variantName, ext string) string {
+	return mediaID + "-" + variantName + ext
+}
+
+func processedMediaBytes(original mediaprocess.ProcessedImage, variants []mediaprocess.Variant) int64 {
+	total := int64(len(original.Data))
+	for _, variant := range variants {
+		total += int64(len(variant.Data))
+	}
+	return total
+}
+
+func removeFiles(paths []string) {
+	for _, path := range paths {
+		_ = os.Remove(path)
+	}
 }
 
 // enforceMediaQuota explains one unit of behavior in this package.
