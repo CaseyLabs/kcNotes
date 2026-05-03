@@ -2,9 +2,12 @@ package media
 
 import (
 	"bytes"
+	"encoding/binary"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/png"
+	"strings"
 	"testing"
 )
 
@@ -40,4 +43,41 @@ func TestNormalizePNGAndBuildVariants(t *testing.T) {
 	if variants[0].Width != 320 || variants[0].Height != 160 {
 		t.Fatalf("expected 320x160 variant, got %dx%d", variants[0].Width, variants[0].Height)
 	}
+}
+
+func TestNormalizeRejectsOversizedDimensionsBeforeDecode(t *testing.T) {
+	t.Parallel()
+
+	_, err := Normalize(pngHeaderWithDimensions(maxImageDimension+1, 1), "image/png")
+	if err == nil {
+		t.Fatalf("expected oversized image rejection")
+	}
+	if !strings.Contains(err.Error(), "dimensions exceed limit") {
+		t.Fatalf("expected dimension limit error, got %v", err)
+	}
+}
+
+func pngHeaderWithDimensions(width, height uint32) []byte {
+	var data bytes.Buffer
+	data.Write([]byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'})
+
+	ihdr := make([]byte, 13)
+	binary.BigEndian.PutUint32(ihdr[0:4], width)
+	binary.BigEndian.PutUint32(ihdr[4:8], height)
+	ihdr[8] = 8
+	ihdr[9] = 2
+
+	writePNGChunk(&data, "IHDR", ihdr)
+	writePNGChunk(&data, "IEND", nil)
+	return data.Bytes()
+}
+
+func writePNGChunk(dst *bytes.Buffer, kind string, payload []byte) {
+	_ = binary.Write(dst, binary.BigEndian, uint32(len(payload)))
+	dst.WriteString(kind)
+	dst.Write(payload)
+	crc := crc32.NewIEEE()
+	_, _ = crc.Write([]byte(kind))
+	_, _ = crc.Write(payload)
+	_ = binary.Write(dst, binary.BigEndian, crc.Sum32())
 }

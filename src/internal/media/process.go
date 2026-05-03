@@ -13,6 +13,11 @@ import (
 	"math"
 )
 
+const (
+	maxImageDimension = 10_000
+	maxImagePixels    = 40_000_000
+)
+
 type ProcessedImage struct {
 	Data   []byte
 	MIME   string
@@ -37,6 +42,9 @@ func Normalize(data []byte, mimeType string) (ProcessedImage, error) {
 	}
 	if cfg.Width <= 0 || cfg.Height <= 0 {
 		return ProcessedImage{}, fmt.Errorf("invalid image dimensions")
+	}
+	if cfg.Width > maxImageDimension || cfg.Height > maxImageDimension || cfg.Width > maxImagePixels/cfg.Height {
+		return ProcessedImage{}, fmt.Errorf("image dimensions exceed limit")
 	}
 
 	switch mimeType {
