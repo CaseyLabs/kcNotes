@@ -48,6 +48,9 @@ type Config struct {
 	WebAuthnRPID          string
 	WebAuthnRPName        string
 	WebAuthnOrigins       []string
+	JobsPollInterval      time.Duration
+	AutosaveRetention     time.Duration
+	AutosaveCleanupEvery  time.Duration
 }
 
 // LoadConfig explains one unit of behavior in this package.
@@ -85,6 +88,9 @@ func LoadConfig() Config {
 		WebAuthnRPID:          getEnv("WEBAUTHN_RP_ID", ""),
 		WebAuthnRPName:        getEnv("WEBAUTHN_RP_NAME", "kcNotes"),
 		WebAuthnOrigins:       getListEnv("WEBAUTHN_ORIGINS"),
+		JobsPollInterval:      getDurationEnv("JOBS_POLL_INTERVAL", 15*time.Second),
+		AutosaveRetention:     getDurationEnv("AUTOSAVE_RETENTION_DURATION", 720*time.Hour),
+		AutosaveCleanupEvery:  getDurationEnv("AUTOSAVE_CLEANUP_INTERVAL", 1*time.Hour),
 	}
 	return cfg
 }

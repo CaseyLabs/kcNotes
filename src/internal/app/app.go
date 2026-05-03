@@ -35,6 +35,12 @@ type App struct {
 	dbConn   *storesqlite.Connection
 	renderer *views.Renderer
 	ipRes    *middleware.ClientIPResolver
+	jobStore *storesqlite.AuthStore
+
+	jobsPollInterval     time.Duration
+	autosaveRetention    time.Duration
+	autosaveCleanupEvery time.Duration
+	jobsMetrics          *jobsMetrics
 }
 
 // New explains one unit of behavior in this package.
@@ -68,12 +74,15 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 	}
 
 	return &App{
-		cfg:      cfg,
-		logger:   logger,
-		db:       conn.DB,
-		dbConn:   conn,
-		renderer: renderer,
-		ipRes:    ipRes,
+		cfg:                  cfg,
+		logger:               logger,
+		db:                   conn.DB,
+		dbConn:               conn,
+		renderer:             renderer,
+		ipRes:                ipRes,
+		jobsPollInterval:     cfg.JobsPollInterval,
+		autosaveRetention:    cfg.AutosaveRetention,
+		autosaveCleanupEvery: cfg.AutosaveCleanupEvery,
 	}, nil
 }
 
@@ -109,7 +118,11 @@ func (a *App) Publish(ctx context.Context) (publish.Result, error) {
 // Router explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func (a *App) Router() *routes.Router {
-	authStore := storesqlite.NewAuthStore(a.db)
+	authStore := a.jobStore
+	if authStore == nil {
+		authStore = storesqlite.NewAuthStore(a.db)
+		a.jobStore = authStore
+	}
 	webAuthn, err := auth.NewWebAuthn(auth.WebAuthnConfig{
 		RPID:        a.cfg.WebAuthnRPID,
 		RPName:      a.cfg.WebAuthnRPName,

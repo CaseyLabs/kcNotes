@@ -49,10 +49,15 @@ func main() {
 	case "serve":
 		ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 		defer stop()
+		router := application.Router()
+		if err := application.StartBackgroundJobs(ctx); err != nil {
+			logger.Error("start background jobs", "error", err)
+			os.Exit(1)
+		}
 
 		srv := &http.Server{
 			Addr:              cfg.HTTPAddr,
-			Handler:           application.Router(),
+			Handler:           router,
 			ReadTimeout:       10 * time.Second,
 			ReadHeaderTimeout: 5 * time.Second,
 			WriteTimeout:      15 * time.Second,

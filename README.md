@@ -214,6 +214,9 @@ Common environment variables:
 | `LOGIN_LOCKOUT_THRESHOLD`     | `8`                               | Failed login attempts before lockout.                                         |
 | `LOGIN_LOCKOUT_WINDOW`        | `15m`                             | Time window for counting failed login attempts.                               |
 | `LOGIN_LOCKOUT_DURATION`      | `15m`                             | Duration of account lockout after threshold is reached.                       |
+| `JOBS_POLL_INTERVAL`          | `15s`                             | Poll interval for background job claim/execution in serve mode.               |
+| `AUTOSAVE_RETENTION_DURATION` | `720h`                            | Stale autosave retention window used by background cleanup jobs.              |
+| `AUTOSAVE_CLEANUP_INTERVAL`   | `1h`                              | Recurring cadence for autosave cleanup job execution.                         |
 | `WEBAUTHN_RP_ID`              | `localhost` in dev                | WebAuthn relying party ID, usually the admin host without scheme or port.     |
 | `WEBAUTHN_RP_NAME`            | `kcNotes`                         | Display name shown by browser passkey prompts.                                |
 | `WEBAUTHN_ORIGINS`            | derived from `SITE_BASE_URL`      | Comma-separated allowed origins, such as `https://cms.example.com`.           |
