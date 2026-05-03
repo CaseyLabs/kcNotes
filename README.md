@@ -232,7 +232,8 @@ Common environment variables:
 Keep WebAuthn attestation restrictions opt-in. `direct`, `enterprise`, and
 AAGUID allowlists can block common platform passkeys and password-manager
 passkeys when the browser or authenticator does not provide matching
-attestation data.
+attestation data. When `WEBAUTHN_ALLOWED_AAGUIDS` is set, credentials with an
+all-zero AAGUID are rejected unless the all-zero AAGUID is explicitly allowed.
 
 ## Remote DB Examples
 

@@ -75,6 +75,11 @@ func (h *Admin) SetupRegistrationFinish(w http.ResponseWriter, r *http.Request) 
 		writeJSONError(w, http.StatusUnauthorized, "setup failed")
 		return
 	}
+	if err := auth.EnforceAllowedAAGUIDs(credential, h.webAuthn.Config.Filtering); err != nil {
+		h.logger.Warn("first-admin passkey rejected by AAGUID policy", "error", err)
+		writeJSONError(w, http.StatusUnauthorized, "setup failed")
+		return
+	}
 	credentialID, err := randomID()
 	if err != nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "setup failed")
@@ -274,6 +279,11 @@ func (h *Admin) finishRegistrationForUser(w http.ResponseWriter, r *http.Request
 	credential, err := h.webAuthn.FinishRegistration(auth.WebAuthnUser{User: user, Credential: webAuthnCredentials}, session, r)
 	if err != nil {
 		h.logger.Warn("finish passkey registration", "error", err, "user_id", user.ID, "challenge_type", challengeType)
+		writeJSONError(w, http.StatusUnauthorized, "passkey registration failed")
+		return
+	}
+	if err := auth.EnforceAllowedAAGUIDs(credential, h.webAuthn.Config.Filtering); err != nil {
+		h.logger.Warn("passkey rejected by AAGUID policy", "error", err, "user_id", user.ID, "challenge_type", challengeType)
 		writeJSONError(w, http.StatusUnauthorized, "passkey registration failed")
 		return
 	}

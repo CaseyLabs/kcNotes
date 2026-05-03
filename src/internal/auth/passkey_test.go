@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/google/uuid"
 )
 
 func TestNewWebAuthnAttestationConveyance(t *testing.T) {
@@ -86,5 +88,26 @@ func TestNewWebAuthnRejectsInvalidAllowedAAGUID(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "WEBAUTHN_ALLOWED_AAGUIDS") {
 		t.Fatalf("expected env var name in error, got %v", err)
+	}
+}
+
+func TestEnforceAllowedAAGUIDsRejectsZeroAAGUID(t *testing.T) {
+	err := EnforceAllowedAAGUIDs(
+		&webauthn.Credential{Authenticator: webauthn.Authenticator{AAGUID: uuid.Nil[:]}},
+		&webauthn.FilteringConfig{PermittedAAGUIDs: []uuid.UUID{uuid.MustParse("00000000-0000-0000-0000-000000000001")}},
+	)
+	if err == nil {
+		t.Fatalf("expected zero AAGUID to be rejected when allowlist is configured")
+	}
+}
+
+func TestEnforceAllowedAAGUIDsAcceptsPermittedAAGUID(t *testing.T) {
+	permitted := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	err := EnforceAllowedAAGUIDs(
+		&webauthn.Credential{Authenticator: webauthn.Authenticator{AAGUID: permitted[:]}},
+		&webauthn.FilteringConfig{PermittedAAGUIDs: []uuid.UUID{permitted}},
+	)
+	if err != nil {
+		t.Fatalf("expected permitted AAGUID to pass: %v", err)
 	}
 }

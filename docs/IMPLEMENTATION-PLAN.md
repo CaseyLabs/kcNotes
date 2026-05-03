@@ -327,7 +327,8 @@ default for broad platform-passkey compatibility.
   `enterprise`; invalid values fail WebAuthn setup instead of silently
   weakening policy.
 - `WEBAUTHN_ALLOWED_AAGUIDS` accepts a comma-separated authenticator AAGUID
-  allowlist and leaves registration unrestricted when unset.
+  allowlist, leaves registration unrestricted when unset, and rejects all-zero
+  AAGUID credentials unless the all-zero AAGUID is explicitly allowed.
 - Strict attestation conveyance and AAGUID allowlists are deployment-controlled
   because they can block common platform and password-manager passkeys.
 

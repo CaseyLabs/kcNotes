@@ -98,6 +98,25 @@ func parseAllowedAAGUIDs(values []string) ([]uuid.UUID, error) {
 	return ids, nil
 }
 
+func EnforceAllowedAAGUIDs(credential *webauthn.Credential, filtering *webauthn.FilteringConfig) error {
+	if filtering == nil || len(filtering.PermittedAAGUIDs) == 0 {
+		return nil
+	}
+	if credential == nil {
+		return fmt.Errorf("credential is required for AAGUID policy")
+	}
+	aaguid, err := uuid.FromBytes(credential.Authenticator.AAGUID)
+	if err != nil {
+		return fmt.Errorf("invalid credential AAGUID: %w", err)
+	}
+	for _, permitted := range filtering.PermittedAAGUIDs {
+		if aaguid == permitted {
+			return nil
+		}
+	}
+	return fmt.Errorf("credential AAGUID is not permitted")
+}
+
 type WebAuthnUser struct {
 	User       domain.User
 	Credential []webauthn.Credential
