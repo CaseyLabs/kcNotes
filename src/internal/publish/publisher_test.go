@@ -97,6 +97,9 @@ func TestPublisherBuildsStaticSiteAndReplacesOldOutput(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(uploadDir, "img-1.png"), []byte{0x89, 0x50, 0x4e, 0x47}, 0o644); err != nil {
 		t.Fatalf("write upload: %v", err)
 	}
+	if err := os.WriteFile(filepath.Join(uploadDir, "img-1-thumb.png"), []byte{0x89, 0x50, 0x4e, 0x47}, 0o644); err != nil {
+		t.Fatalf("write media variant: %v", err)
+	}
 
 	outDir := filepath.Join(root, "dist")
 	if err := os.MkdirAll(filepath.Join(outDir, "old"), 0o755); err != nil {
@@ -134,6 +137,11 @@ func TestPublisherBuildsStaticSiteAndReplacesOldOutput(t *testing.T) {
 			ID:         "m1",
 			StoredName: "img-1.png",
 			MIME:       "image/png",
+			Variants: []domain.MediaVariant{{
+				Name:       "thumb",
+				StoredName: "img-1-thumb.png",
+				MIME:       "image/png",
+			}},
 		}},
 	}
 
@@ -161,6 +169,7 @@ func TestPublisherBuildsStaticSiteAndReplacesOldOutput(t *testing.T) {
 		filepath.Join(outDir, "assets", "css", "app.css"),
 		filepath.Join(outDir, "assets", "js", "app.js"),
 		filepath.Join(outDir, "media", "img-1.png"),
+		filepath.Join(outDir, "media", "img-1-thumb.png"),
 		filepath.Join(outDir, manifestName),
 	}
 	for _, f := range expectFiles {

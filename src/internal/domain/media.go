@@ -17,6 +17,20 @@ type Media struct {
 	MIME         string
 	Size         int64
 	SHA256       string
+	Width        int
+	Height       int
 	CreatedBy    string
 	CreatedAt    time.Time
+	Variants     []MediaVariant
+}
+
+type MediaVariant struct {
+	MediaID    string
+	Name       string
+	StoredName string
+	MIME       string
+	Size       int64
+	Width      int
+	Height     int
+	CreatedAt  time.Time
 }

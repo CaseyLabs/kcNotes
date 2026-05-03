@@ -5,4 +5,4 @@ PROJECT_CFG_FILE=${1:-${PROJECT_CFG_FILE:-config/project.cfg}}
 . ./scripts/app-lib.sh
 
 ensure_dev_image
-run_in_dev_container "cd src && mkdir -p /workspace/.cache && PUBLISH_OUT_DIR=\"\${PUBLISH_OUT_DIR:-../dist/site}\" GOFLAGS='-tags=sqlite_fts5' go run ./cmd/cms -mode publish"
+run_in_dev_container "cd src && mkdir -p /workspace/.cache && GOFLAGS='-tags=sqlite_fts5' go run ./cmd/cms -mode migrate && PUBLISH_OUT_DIR=\"\${PUBLISH_OUT_DIR:-../dist/site}\" GOFLAGS='-tags=sqlite_fts5' go run ./cmd/cms -mode publish"

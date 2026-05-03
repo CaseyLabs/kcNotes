@@ -80,6 +80,7 @@ type adminStore interface {
 	SetPostStatus(ctx context.Context, id string, status domain.PostStatus, publishedAt *time.Time, actor domain.User) (bool, error)
 	SoftDeletePost(ctx context.Context, id string, actor domain.User) (bool, error)
 	CreateMedia(ctx context.Context, media domain.Media) error
+	CreateMediaWithVariants(ctx context.Context, media domain.Media, variants []domain.MediaVariant) error
 	MediaUsage(ctx context.Context, userID string) (userBytes, totalBytes int64, err error)
 	ListMedia(ctx context.Context, limit int) ([]domain.Media, error)
 	GetMediaByID(ctx context.Context, id string) (domain.Media, error)

@@ -521,6 +521,46 @@ func TestMediaStoreCreateListAndGet(t *testing.T) {
 	}
 }
 
+func TestMediaStoreCreateWithVariants(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newTestAuthStore(t)
+
+	user := domain.User{ID: "u-media-variants", Email: "variants@example.com", PasswordHash: "x", Role: domain.RoleEditor}
+	mustNoErr(t, store.CreateUser(ctx, user))
+
+	mustNoErr(t, store.CreateMediaWithVariants(ctx, domain.Media{
+		ID:           "m-variants",
+		StoredName:   "original.png",
+		OriginalName: "photo.png",
+		MIME:         "image/png",
+		Size:         1000,
+		SHA256:       "abc123",
+		Width:        1200,
+		Height:       800,
+		CreatedBy:    user.ID,
+	}, []domain.MediaVariant{{
+		Name:       "thumb",
+		StoredName: "m-variants-thumb.png",
+		MIME:       "image/png",
+		Size:       200,
+		Width:      320,
+		Height:     213,
+	}}))
+
+	item, err := store.GetMediaByID(ctx, "m-variants")
+	mustNoErr(t, err)
+	if item.Width != 1200 || item.Height != 800 {
+		t.Fatalf("expected original dimensions, got %dx%d", item.Width, item.Height)
+	}
+	if len(item.Variants) != 1 {
+		t.Fatalf("expected one variant, got %d", len(item.Variants))
+	}
+	if item.Variants[0].StoredName != "m-variants-thumb.png" {
+		t.Fatalf("expected variant stored name, got %s", item.Variants[0].StoredName)
+	}
+}
+
 // TestMediaStoreUsage explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func TestMediaStoreUsage(t *testing.T) {
