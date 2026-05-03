@@ -40,7 +40,7 @@ func TestJobsStoreEnsureClaimAndComplete(t *testing.T) {
 		t.Fatalf("expected duplicate key ensure to no-op")
 	}
 
-	job, ok, err := store.ClaimDueJob(ctx, time.Now().UTC())
+	job, ok, err := store.ClaimDueJob(ctx, time.Now().UTC(), 5*time.Minute)
 	mustNoErr(t, err)
 	if !ok {
 		t.Fatalf("expected due job to be claimed")
@@ -56,6 +56,91 @@ func TestJobsStoreEnsureClaimAndComplete(t *testing.T) {
 	mustNoErr(t, err)
 	if pending != 1 || running != 0 {
 		t.Fatalf("unexpected queue counts pending=%d running=%d", pending, running)
+	}
+}
+
+func TestFailJobMarksFailedAtMaxAttempts(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newJobsTestAuthStore(t)
+
+	_, err := store.EnsureJob(ctx, Job{
+		ID:          "job-fail",
+		Type:        "autosave_cleanup",
+		Key:         "autosave-cleanup-fail",
+		PayloadJSON: `{}`,
+		MaxAttempts: 1,
+		RunAt:       time.Now().UTC().Add(-time.Minute),
+	})
+	mustNoErr(t, err)
+
+	job, ok, err := store.ClaimDueJob(ctx, time.Now().UTC(), 5*time.Minute)
+	mustNoErr(t, err)
+	if !ok {
+		t.Fatalf("expected due job to be claimed")
+	}
+
+	now := time.Now().UTC()
+	mustNoErr(t, store.FailJob(ctx, job, now, 30*time.Second, "boom"))
+
+	var status, lastError string
+	var attempts int
+	err = store.db.QueryRowContext(ctx, `
+		SELECT status, attempts, COALESCE(last_error, '')
+		FROM jobs
+		WHERE id = ?
+	`, job.ID).Scan(&status, &attempts, &lastError)
+	mustNoErr(t, err)
+
+	if status != JobStatusFailed {
+		t.Fatalf("expected failed status, got %q", status)
+	}
+	if attempts != 1 {
+		t.Fatalf("expected attempts to remain 1 after failure, got %d", attempts)
+	}
+	if lastError != "boom" {
+		t.Fatalf("expected last_error to be recorded, got %q", lastError)
+	}
+}
+
+func TestClaimDueJobReclaimsStaleRunningJob(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newJobsTestAuthStore(t)
+
+	_, err := store.EnsureJob(ctx, Job{
+		ID:          "job-stale",
+		Type:        "autosave_cleanup",
+		Key:         "autosave-cleanup-stale",
+		PayloadJSON: `{}`,
+		MaxAttempts: 3,
+		RunAt:       time.Now().UTC().Add(-time.Minute),
+	})
+	mustNoErr(t, err)
+
+	t0 := time.Now().UTC()
+	job, ok, err := store.ClaimDueJob(ctx, t0, 5*time.Minute)
+	mustNoErr(t, err)
+	if !ok || job.ID != "job-stale" {
+		t.Fatalf("expected initial claim for stale job, got ok=%v job=%+v", ok, job)
+	}
+
+	_, ok, err = store.ClaimDueJob(ctx, t0.Add(2*time.Minute), 5*time.Minute)
+	mustNoErr(t, err)
+	if ok {
+		t.Fatalf("did not expect job to be reclaimable before stale timeout")
+	}
+
+	reclaimed, ok, err := store.ClaimDueJob(ctx, t0.Add(6*time.Minute), 5*time.Minute)
+	mustNoErr(t, err)
+	if !ok {
+		t.Fatalf("expected stale running job to be reclaimed")
+	}
+	if reclaimed.ID != "job-stale" {
+		t.Fatalf("expected reclaimed job id job-stale, got %q", reclaimed.ID)
+	}
+	if reclaimed.Attempts != 2 {
+		t.Fatalf("expected attempts incremented on reclaim, got %d", reclaimed.Attempts)
 	}
 }
 

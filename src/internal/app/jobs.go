@@ -85,7 +85,7 @@ func (a *App) runJobs(ctx context.Context) {
 
 func (a *App) runJobsOnce(ctx context.Context) {
 	now := time.Now().UTC()
-	job, ok, err := a.jobStore.ClaimDueJob(ctx, now)
+	job, ok, err := a.jobStore.ClaimDueJob(ctx, now, 5*time.Minute)
 	if err != nil {
 		a.logger.Error("claim due job", "error", err)
 		return
@@ -99,9 +99,6 @@ func (a *App) runJobsOnce(ctx context.Context) {
 		a.jobsMetrics.failureTotal.Add(1)
 		a.logger.Error("run job", "job_type", job.Type, "job_key", job.Key, "error", err)
 		_ = a.jobStore.FailJob(ctx, job, now, 30*time.Second, err.Error())
-		if job.Key == autosaveCleanupJobKey {
-			_ = a.jobStore.CompleteJob(ctx, job.ID, now.Add(a.autosaveCleanupEvery))
-		}
 		return
 	}
 

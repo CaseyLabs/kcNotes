@@ -77,21 +77,29 @@ func (s *AuthStore) EnsureJob(ctx context.Context, job Job) (bool, error) {
 	return rows > 0, nil
 }
 
-// ClaimDueJob atomically claims the next due pending job.
-func (s *AuthStore) ClaimDueJob(ctx context.Context, now time.Time) (Job, bool, error) {
+// ClaimDueJob atomically claims the next due pending job or a stale running job.
+func (s *AuthStore) ClaimDueJob(ctx context.Context, now time.Time, staleAfter time.Duration) (Job, bool, error) {
 	nowUTC := now.UTC().Format(time.RFC3339Nano)
+	staleCutoffUTC := now.UTC().Add(-staleAfter).Format(time.RFC3339Nano)
 	var claimed Job
 	err := s.retry.TxRetry(ctx, s.db, nil, func(tx *sql.Tx) error {
 		row := tx.QueryRowContext(ctx, `
-			SELECT id, job_type, job_key, payload_json, attempts, max_attempts, run_at, created_at, updated_at
+			SELECT id, job_type, job_key, payload_json, attempts, max_attempts, run_at, locked_at, created_at, updated_at
 			FROM jobs
-			WHERE status = ? AND datetime(run_at) <= datetime(?)
-			ORDER BY datetime(run_at) ASC, created_at ASC
+			WHERE
+				(status = ? AND datetime(run_at) <= datetime(?))
+				OR
+				(status = ? AND (locked_at IS NULL OR datetime(locked_at) <= datetime(?)))
+			ORDER BY
+				CASE status WHEN ? THEN 0 ELSE 1 END,
+				datetime(run_at) ASC,
+				created_at ASC
 			LIMIT 1
-		`, JobStatusPending, nowUTC)
+		`, JobStatusPending, nowUTC, JobStatusRunning, staleCutoffUTC, JobStatusPending)
 
 		var runAtRaw, createdAtRaw, updatedAtRaw string
-		err := row.Scan(&claimed.ID, &claimed.Type, &claimed.Key, &claimed.PayloadJSON, &claimed.Attempts, &claimed.MaxAttempts, &runAtRaw, &createdAtRaw, &updatedAtRaw)
+		var lockedAtRaw sql.NullString
+		err := row.Scan(&claimed.ID, &claimed.Type, &claimed.Key, &claimed.PayloadJSON, &claimed.Attempts, &claimed.MaxAttempts, &runAtRaw, &lockedAtRaw, &createdAtRaw, &updatedAtRaw)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return nil
@@ -111,12 +119,25 @@ func (s *AuthStore) ClaimDueJob(ctx context.Context, now time.Time) (Job, bool, 
 		if err != nil {
 			return fmt.Errorf("parse updated_at: %w", err)
 		}
+		if lockedAtRaw.Valid {
+			lockedAt, err := time.Parse(time.RFC3339Nano, lockedAtRaw.String)
+			if err != nil {
+				return fmt.Errorf("parse locked_at: %w", err)
+			}
+			claimed.LockedAt = &lockedAt
+		}
 
 		res, err := tx.ExecContext(ctx, `
 			UPDATE jobs
 			SET status = ?, attempts = attempts + 1, locked_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-			WHERE id = ? AND status = ?
-		`, JobStatusRunning, nowUTC, claimed.ID, JobStatusPending)
+			WHERE
+				id = ?
+				AND (
+					status = ?
+					OR
+					(status = ? AND (locked_at IS NULL OR datetime(locked_at) <= datetime(?)))
+				)
+		`, JobStatusRunning, nowUTC, claimed.ID, JobStatusPending, JobStatusRunning, staleCutoffUTC)
 		if err != nil {
 			return err
 		}
