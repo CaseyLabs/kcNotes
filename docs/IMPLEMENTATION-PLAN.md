@@ -320,8 +320,17 @@ completion scope.
 
 ### O1: Passkey Attestation Policy
 
-Optional passkey attestation policy remains backlog if a deployment needs
-hardware-key-only enrollment. No attestation enforcement is active by default.
+Optional passkey attestation policy is implemented and remains disabled by
+default for broad platform-passkey compatibility.
+
+- `WEBAUTHN_ATTESTATION_CONVEYANCE` accepts `none`, `indirect`, `direct`, and
+  `enterprise`; invalid values fail WebAuthn setup instead of silently
+  weakening policy.
+- `WEBAUTHN_ALLOWED_AAGUIDS` accepts a comma-separated authenticator AAGUID
+  allowlist, leaves registration unrestricted when unset, and rejects all-zero
+  AAGUID credentials unless the all-zero AAGUID is explicitly allowed.
+- Strict attestation conveyance and AAGUID allowlists are deployment-controlled
+  because they can block common platform and password-manager passkeys.
 
 ### O2: Media Processing Pipeline
 

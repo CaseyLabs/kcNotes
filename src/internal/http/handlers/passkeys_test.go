@@ -64,6 +64,28 @@ func TestPasskeyRegistrationOptionsRequireResidentKeyAndUserVerification(t *test
 	}
 }
 
+func TestPasskeyRegistrationUsesConfiguredAttestationConveyance(t *testing.T) {
+	wa, err := auth.NewWebAuthn(auth.WebAuthnConfig{
+		RPID:        "localhost",
+		RPName:      "kcNotes",
+		RPOrigins:   []string{"http://localhost:5555"},
+		Attestation: "direct",
+	})
+	if err != nil {
+		t.Fatalf("new webauthn: %v", err)
+	}
+	user := auth.WebAuthnUser{User: domain.User{ID: "user-1", Email: "admin@example.com"}}
+
+	creation, _, err := wa.BeginRegistration(user, passkeyRegistrationOptions()...)
+	if err != nil {
+		t.Fatalf("begin registration: %v", err)
+	}
+
+	if creation.Response.Attestation != protocol.PreferDirectAttestation {
+		t.Fatalf("expected direct attestation conveyance, got %q", creation.Response.Attestation)
+	}
+}
+
 func newTestWebAuthn(t *testing.T) *webauthn.WebAuthn {
 	t.Helper()
 	wa, err := auth.NewWebAuthn(auth.WebAuthnConfig{

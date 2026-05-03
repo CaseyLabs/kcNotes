@@ -124,11 +124,13 @@ func (a *App) Router() *routes.Router {
 		a.jobStore = authStore
 	}
 	webAuthn, err := auth.NewWebAuthn(auth.WebAuthnConfig{
-		RPID:        a.cfg.WebAuthnRPID,
-		RPName:      a.cfg.WebAuthnRPName,
-		RPOrigins:   a.cfg.WebAuthnOrigins,
-		SiteBaseURL: a.cfg.SiteBaseURL,
-		AppEnv:      a.cfg.AppEnv,
+		RPID:           a.cfg.WebAuthnRPID,
+		RPName:         a.cfg.WebAuthnRPName,
+		RPOrigins:      a.cfg.WebAuthnOrigins,
+		SiteBaseURL:    a.cfg.SiteBaseURL,
+		AppEnv:         a.cfg.AppEnv,
+		Attestation:    a.cfg.WebAuthnAttestation,
+		AllowedAAGUIDs: a.cfg.WebAuthnAllowedAAGUIDs,
 	})
 	if err != nil {
 		a.logger.Error("webauthn unavailable", "error", err)

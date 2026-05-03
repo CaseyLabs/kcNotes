@@ -195,37 +195,45 @@ provider's administrative SQL access after taking a backup or snapshot.
 
 Common environment variables:
 
-| Variable                      | Default                           | Description                                                                   |
-| ----------------------------- | --------------------------------- | ----------------------------------------------------------------------------- |
-| `DB_MODE`                     | `local`                           | Database mode. Valid values: `local`, `remote`, `replica`.                    |
-| `DB_PATH`                     | `./data/cms.db`                   | Filesystem path for the database. Used by `local` and `replica`.              |
-| `DATABASE_URL`                | —                                 | Required for `remote` and `replica` modes.                                    |
-| `DATABASE_AUTH_TOKEN`         | —                                 | Required for Turso/libSQL authentication when not embedded in `DATABASE_URL`. |
-| `REPLICA_SYNC_INTERVAL`       | `2s`                              | Interval for syncing replica with remote.                                     |
-| `REPLICA_READ_YOUR_WRITES`    | `true`                            | Ensures reads reflect recent writes in replica mode.                          |
-| `SESSION_COOKIE_NAME`         | `cms_session`                     | Name of the session cookie.                                                   |
-| `CSRF_COOKIE_NAME`            | `cms_csrf`                        | Name of the CSRF cookie.                                                      |
-| `ADMIN_COOKIE_PATH`           | `/admin`                          | Path scope for admin cookies.                                                 |
-| `SESSION_TTL`                 | `24h`                             | Session time-to-live.                                                         |
-| `COOKIE_SECURE`               | `false` (dev), `true` (otherwise) | Whether cookies are marked as secure.                                         |
-| `UPLOAD_DIR`                  | `./data/uploads`                  | Directory for uploaded files (inside `src/` at runtime).                      |
-| `MEDIA_USER_QUOTA_BYTES`      | `209715200`                       | Per-user media storage quota in bytes.                                        |
-| `MEDIA_TOTAL_QUOTA_BYTES`     | `2147483648`                      | Total media storage quota in bytes.                                           |
-| `LOGIN_LOCKOUT_THRESHOLD`     | `8`                               | Failed login attempts before lockout.                                         |
-| `LOGIN_LOCKOUT_WINDOW`        | `15m`                             | Time window for counting failed login attempts.                               |
-| `LOGIN_LOCKOUT_DURATION`      | `15m`                             | Duration of account lockout after threshold is reached.                       |
-| `JOBS_POLL_INTERVAL`          | `15s`                             | Poll interval for background job claim/execution in serve mode.               |
-| `AUTOSAVE_RETENTION_DURATION` | `720h`                            | Stale autosave retention window used by background cleanup jobs.              |
-| `AUTOSAVE_CLEANUP_INTERVAL`   | `1h`                              | Recurring cadence for autosave cleanup job execution.                         |
-| `WEBAUTHN_RP_ID`              | `localhost` in dev                | WebAuthn relying party ID, usually the admin host without scheme or port.     |
-| `WEBAUTHN_RP_NAME`            | `kcNotes`                         | Display name shown by browser passkey prompts.                                |
-| `WEBAUTHN_ORIGINS`            | derived from `SITE_BASE_URL`      | Comma-separated allowed origins, such as `https://cms.example.com`.           |
-| `SITE_BASE_URL`               | —                                 | Base URL used for canonical links, RSS, and sitemap generation.               |
-| `PUBLISH_OUT_DIR`             | `../dist/site`                    | Output directory for published site (from inside `src/`).                     |
-| `PUBLISH_INCLUDE_DRAFTS`      | `false`                           | Whether to include draft content in published output.                         |
-| `PREVIEW_HTTP_ADDR`           | `:8080`                           | Address used by preview server (in container).                                |
-| `TRUSTED_PROXY_CIDRS`         | —                                 | List of trusted proxy CIDR ranges.                                            |
-| `ENFORCE_TRUSTED_PROXY_CIDRS` | —                                 | Whether to enforce trusted proxy CIDR checks.                                 |
+| Variable                           | Default                           | Description                                                                                    |
+| ---------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `DB_MODE`                          | `local`                           | Database mode. Valid values: `local`, `remote`, `replica`.                                     |
+| `DB_PATH`                          | `./data/cms.db`                   | Filesystem path for the database. Used by `local` and `replica`.                               |
+| `DATABASE_URL`                     | —                                 | Required for `remote` and `replica` modes.                                                     |
+| `DATABASE_AUTH_TOKEN`              | —                                 | Required for Turso/libSQL authentication when not embedded in `DATABASE_URL`.                  |
+| `REPLICA_SYNC_INTERVAL`            | `2s`                              | Interval for syncing replica with remote.                                                      |
+| `REPLICA_READ_YOUR_WRITES`         | `true`                            | Ensures reads reflect recent writes in replica mode.                                           |
+| `SESSION_COOKIE_NAME`              | `cms_session`                     | Name of the session cookie.                                                                    |
+| `CSRF_COOKIE_NAME`                 | `cms_csrf`                        | Name of the CSRF cookie.                                                                       |
+| `ADMIN_COOKIE_PATH`                | `/admin`                          | Path scope for admin cookies.                                                                  |
+| `SESSION_TTL`                      | `24h`                             | Session time-to-live.                                                                          |
+| `COOKIE_SECURE`                    | `false` (dev), `true` (otherwise) | Whether cookies are marked as secure.                                                          |
+| `UPLOAD_DIR`                       | `./data/uploads`                  | Directory for uploaded files (inside `src/` at runtime).                                       |
+| `MEDIA_USER_QUOTA_BYTES`           | `209715200`                       | Per-user media storage quota in bytes.                                                         |
+| `MEDIA_TOTAL_QUOTA_BYTES`          | `2147483648`                      | Total media storage quota in bytes.                                                            |
+| `LOGIN_LOCKOUT_THRESHOLD`          | `8`                               | Failed login attempts before lockout.                                                          |
+| `LOGIN_LOCKOUT_WINDOW`             | `15m`                             | Time window for counting failed login attempts.                                                |
+| `LOGIN_LOCKOUT_DURATION`           | `15m`                             | Duration of account lockout after threshold is reached.                                        |
+| `JOBS_POLL_INTERVAL`               | `15s`                             | Poll interval for background job claim/execution in serve mode.                                |
+| `AUTOSAVE_RETENTION_DURATION`      | `720h`                            | Stale autosave retention window used by background cleanup jobs.                               |
+| `AUTOSAVE_CLEANUP_INTERVAL`        | `1h`                              | Recurring cadence for autosave cleanup job execution.                                          |
+| `WEBAUTHN_RP_ID`                   | `localhost` in dev                | WebAuthn relying party ID, usually the admin host without scheme or port.                      |
+| `WEBAUTHN_RP_NAME`                 | `kcNotes`                         | Display name shown by browser passkey prompts.                                                 |
+| `WEBAUTHN_ORIGINS`                 | derived from `SITE_BASE_URL`      | Comma-separated allowed origins, such as `https://cms.example.com`.                            |
+| `WEBAUTHN_ATTESTATION_CONVEYANCE`  | `none`                            | Optional passkey attestation conveyance: `none`, `indirect`, `direct`, or `enterprise`.        |
+| `WEBAUTHN_ALLOWED_AAGUIDS`         | —                                 | Optional comma-separated authenticator AAGUID allowlist for stricter passkey registration.     |
+| `SITE_BASE_URL`                    | —                                 | Base URL used for canonical links, RSS, and sitemap generation.                                |
+| `PUBLISH_OUT_DIR`                  | `../dist/site`                    | Output directory for published site (from inside `src/`).                                      |
+| `PUBLISH_INCLUDE_DRAFTS`           | `false`                           | Whether to include draft content in published output.                                          |
+| `PREVIEW_HTTP_ADDR`                | `:8080`                           | Address used by preview server (in container).                                                 |
+| `TRUSTED_PROXY_CIDRS`              | —                                 | List of trusted proxy CIDR ranges.                                                             |
+| `ENFORCE_TRUSTED_PROXY_CIDRS`      | —                                 | Whether to enforce trusted proxy CIDR checks.                                                  |
+
+Keep WebAuthn attestation restrictions opt-in. `direct`, `enterprise`, and
+AAGUID allowlists can block common platform passkeys and password-manager
+passkeys when the browser or authenticator does not provide matching
+attestation data. When `WEBAUTHN_ALLOWED_AAGUIDS` is set, credentials with an
+all-zero AAGUID are rejected unless the all-zero AAGUID is explicitly allowed.
 
 ## Remote DB Examples
 
