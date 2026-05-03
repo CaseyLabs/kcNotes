@@ -2,12 +2,22 @@
 
 # The root Makefile/scripts pass the locked Go image in as the development base.
 ARG DEV_BASE_IMAGE
+ARG DEV_NODE_IMAGE
+
+FROM ${DEV_NODE_IMAGE:-node:24-trixie-slim} AS node-runtime
 
 FROM ${DEV_BASE_IMAGE:-golang:1.26.2-trixie} AS dev
 
+# Copy Node.js and npm from the official slim image instead of installing
+# Debian's npm package graph, which adds a large package setup step in CI.
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
+    ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+
 # The cleanup at the end removes apt cache files so the image stays smaller.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends bash ca-certificates curl git jq make nodejs npm shellcheck tar gzip && \
+    apt-get install -y --no-install-recommends bash ca-certificates curl git jq make shellcheck tar gzip && \
     rm -rf /var/lib/apt/lists/*
 
 # Create a dedicated unprivileged user instead of running as root. This is a

@@ -87,6 +87,7 @@ jobs:
             .cache/go-build
             .cache/go-mod
             .cache/npm
+            src/node_modules
           key: kcnotes-src-${{ runner.os }}-${{ hashFiles('src/go.sum', 'src/package-lock.json', 'Dockerfile', 'config/project.cfg') }}
           restore-keys: |
             kcnotes-src-${{ runner.os }}-
