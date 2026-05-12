@@ -21,6 +21,11 @@ type contextKey string
 
 const RequestIDKey contextKey = "request_id"
 
+func RequestIDFromContext(r *http.Request) string {
+	id, _ := r.Context().Value(RequestIDKey).(string)
+	return id
+}
+
 // RequestID explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func RequestID(next http.Handler) http.Handler {

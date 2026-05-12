@@ -17,6 +17,7 @@ type MiddlewareSet struct {
 	RequestID       func(http.Handler) http.Handler
 	SecurityHeaders func(http.Handler) http.Handler
 	HTMX            func(http.Handler) http.Handler
+	RequestMetrics  func(http.Handler) http.Handler
 	Session         func(http.Handler) http.Handler
 	CSRF            func(http.Handler) http.Handler
 	RequireAuth     func(http.Handler) http.Handler
@@ -90,6 +91,9 @@ func New(public *handlers.Public, admin *handlers.Admin, staticDir string, mw Mi
 	handler = mw.Session(handler)
 	handler = mw.HTMX(handler)
 	handler = mw.SecurityHeaders(handler)
+	if mw.RequestMetrics != nil {
+		handler = mw.RequestMetrics(handler)
+	}
 	handler = mw.RequestID(handler)
 
 	root := http.NewServeMux()

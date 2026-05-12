@@ -131,8 +131,37 @@ func (a *App) logJobsMetrics(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			snapshot := a.JobsMetricsSnapshot(ctx)
-			a.logger.Info("jobs metrics", "runs_total", snapshot.RunsTotal, "success_total", snapshot.SuccessTotal, "failure_total", snapshot.FailureTotal, "pending", snapshot.Pending, "running", snapshot.Running)
+			jobs := a.JobsMetricsSnapshot(ctx)
+			requests := a.metrics.Snapshot()
+			retries := storesqlite.RetryMetricsSnapshot{}
+			if a.jobStore != nil {
+				retries = a.jobStore.RetryMetrics()
+			}
+			a.logger.Info("operational metrics",
+				"jobs_runs_total", jobs.RunsTotal,
+				"jobs_success_total", jobs.SuccessTotal,
+				"jobs_failure_total", jobs.FailureTotal,
+				"jobs_pending", jobs.Pending,
+				"jobs_running", jobs.Running,
+				"http_requests_total", requests.RequestsTotal,
+				"http_status_1xx", requests.Status1xx,
+				"http_status_2xx", requests.Status2xx,
+				"http_status_3xx", requests.Status3xx,
+				"http_status_4xx", requests.Status4xx,
+				"http_status_5xx", requests.Status5xx,
+				"http_duration_buckets", requests.Duration,
+				"login_success_total", requests.LoginSuccess,
+				"login_failure_total", requests.LoginFailure,
+				"login_lockout_hits_total", requests.LoginLockoutHits,
+				"login_lockout_transitions_total", requests.LoginLockoutTransitions,
+				"rate_limit_login_ip_total", requests.RateLimitLoginIP,
+				"rate_limit_login_account_total", requests.RateLimitLoginAccount,
+				"rate_limit_sensitive_total", requests.RateLimitSensitive,
+				"db_exec_retries", retries.ExecRetries,
+				"db_query_retries", retries.QueryRetries,
+				"db_tx_retries", retries.TxRetries,
+				"db_retry_failures", retries.RetryFailures,
+			)
 		}
 	}
 }

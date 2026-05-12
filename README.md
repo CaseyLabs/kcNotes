@@ -103,6 +103,19 @@ If a newer snapshot exists when an editor is opened, the form shows a recovery
 panel. `Restore Autosave` fills the editor with the snapshot while keeping the
 canonical save action, and `Dismiss` removes that snapshot.
 
+## Operational Observability
+
+Serve mode writes structured operational logs for request and background
+health. Each HTTP request logs method, matched route pattern, status,
+duration, and request ID without logging user-controlled query strings or
+private content.
+
+The background metrics log summarizes in-process counters for HTTP status
+classes and duration buckets, passkey login successes/failures, lockout and
+rate-limit hits, job queue depth, job run outcomes, and database retry counts.
+These logs are intended for collection by the deployment's normal log
+aggregation pipeline; kcNotes does not expose a public metrics endpoint.
+
 ## CLI Modes
 
 The root Make targets run these modes in the project container:

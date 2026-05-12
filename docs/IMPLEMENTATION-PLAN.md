@@ -360,11 +360,20 @@ O3 is partially implemented for the first production workload.
 
 ### O4: Observability Expansion
 
-- Request duration metrics.
-- Login failure and lockout counters.
-- Rate-limit hit counters.
-- DB retry dashboards/log aggregation guidance.
-- Job queue depth metrics if the job runner is added.
+O4 is implemented as in-process structured-log observability without adding a
+public metrics endpoint or external telemetry dependency.
+
+- Each HTTP request logs method, matched route pattern, status, duration, and
+  request ID.
+- Request counters track status classes and duration buckets.
+- Login counters track passkey login successes, failed attempts, lockout hits,
+  and lockout transitions.
+- Rate-limit counters track login-IP, login-account, and sensitive-route
+  denials.
+- Periodic operational logs include job run totals, pending/running queue
+  depth, request/login/rate-limit counters, and DB retry counters.
+- README documents the log-backed observability model and aggregation
+  expectation.
 
 ### O5: Media De-Duplication
 
