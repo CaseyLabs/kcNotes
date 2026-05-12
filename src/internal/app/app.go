@@ -24,6 +24,7 @@ import (
 	"kcnotes/internal/http/middleware"
 	"kcnotes/internal/http/routes"
 	"kcnotes/internal/http/views"
+	"kcnotes/internal/observability"
 	"kcnotes/internal/publish"
 	storesqlite "kcnotes/internal/store/sqlite"
 )
@@ -36,6 +37,7 @@ type App struct {
 	renderer *views.Renderer
 	ipRes    *middleware.ClientIPResolver
 	jobStore *storesqlite.AuthStore
+	metrics  *observability.Metrics
 
 	jobsPollInterval     time.Duration
 	autosaveRetention    time.Duration
@@ -80,6 +82,7 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 		dbConn:               conn,
 		renderer:             renderer,
 		ipRes:                ipRes,
+		metrics:              observability.NewMetrics(),
 		jobsPollInterval:     cfg.JobsPollInterval,
 		autosaveRetention:    cfg.AutosaveRetention,
 		autosaveCleanupEvery: cfg.AutosaveCleanupEvery,
@@ -150,6 +153,7 @@ func (a *App) Router() *routes.Router {
 		LoginLockoutWindow:    a.cfg.LoginLockoutWindow,
 		LoginLockoutDuration:  a.cfg.LoginLockoutDuration,
 		WebAuthn:              webAuthn,
+		Metrics:               a.metrics,
 	})
 
 	loginLimiter := middleware.NewFixedWindowLimiter(10, 10*time.Minute)
@@ -159,6 +163,7 @@ func (a *App) Router() *routes.Router {
 		RequestID:       middleware.RequestID,
 		SecurityHeaders: middleware.SecurityHeaders,
 		HTMX:            middleware.HTMX,
+		RequestMetrics:  middleware.RequestMetrics(a.logger, a.metrics),
 		Session: middleware.SessionLoader(authStore, middleware.SessionConfig{
 			CookieName: a.cfg.SessionCookieName,
 			CookiePath: a.cfg.AdminCookiePath,
@@ -171,8 +176,8 @@ func (a *App) Router() *routes.Router {
 		}),
 		RequireAuth:    middleware.RequireAuth("/admin/login"),
 		RequireAdmin:   middleware.RequireRoles(domain.RoleAdmin),
-		LoginRateLimit: middleware.LoginRateLimit(loginLimiter, a.ipRes),
-		SensitiveLimit: middleware.SensitiveRateLimit(sensitiveLimiter, a.ipRes),
+		LoginRateLimit: middleware.LoginRateLimit(loginLimiter, a.ipRes, a.metrics),
+		SensitiveLimit: middleware.SensitiveRateLimit(sensitiveLimiter, a.ipRes, a.metrics),
 	}
 
 	return routes.New(publicHandlers, adminHandlers, a.cfg.StaticDir, mw)

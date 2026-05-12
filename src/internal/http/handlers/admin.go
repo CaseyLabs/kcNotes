@@ -26,6 +26,7 @@ import (
 	"kcnotes/internal/domain"
 	"kcnotes/internal/http/middleware"
 	"kcnotes/internal/http/views"
+	"kcnotes/internal/observability"
 	storesqlite "kcnotes/internal/store/sqlite"
 
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -46,6 +47,7 @@ type Admin struct {
 	maxMediaUserB   int64
 	maxMediaTotalB  int64
 	webAuthn        *webauthn.WebAuthn
+	metrics         *observability.Metrics
 }
 
 type adminStore interface {
@@ -99,6 +101,7 @@ type AdminConfig struct {
 	LoginLockoutWindow    time.Duration
 	LoginLockoutDuration  time.Duration
 	WebAuthn              *webauthn.WebAuthn
+	Metrics               *observability.Metrics
 }
 
 // NewAdmin explains one unit of behavior in this package.
@@ -131,6 +134,7 @@ func NewAdmin(renderer *views.Renderer, logger *slog.Logger, store adminStore, c
 		maxMediaUserB:   cfg.MediaUserQuotaBytes,
 		maxMediaTotalB:  cfg.MediaTotalQuotaBytes,
 		webAuthn:        cfg.WebAuthn,
+		metrics:         cfg.Metrics,
 	}
 }
 
@@ -229,13 +233,17 @@ func (h *Admin) PasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	loginKey := loginFailureKey(h.clientIP(r))
 	if h.loginFailures.IsLocked(loginKey) {
+		if h.metrics != nil {
+			h.metrics.RecordLoginLockoutHit()
+			h.metrics.RecordLoginFailure()
+		}
 		h.auditFailedLogin(r, "", "")
 		writeJSONError(w, http.StatusUnauthorized, "passkey login failed")
 		return
 	}
 	challenge, err := h.store.ConsumeWebAuthnChallenge(r.Context(), challengeID, "login", time.Now().UTC())
 	if err != nil {
-		h.loginFailures.RecordFailure(loginKey)
+		h.recordPasskeyLoginFailure(loginKey)
 		h.auditFailedLogin(r, "", "")
 		writeJSONError(w, http.StatusUnauthorized, "passkey login failed")
 		return
@@ -261,7 +269,7 @@ func (h *Admin) PasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 		return auth.WebAuthnUser{User: user, Credential: webAuthnCredentials}, nil
 	}, session, r)
 	if err != nil {
-		h.loginFailures.RecordFailure(loginKey)
+		h.recordPasskeyLoginFailure(loginKey)
 		h.auditFailedLogin(r, "", "")
 		writeJSONError(w, http.StatusUnauthorized, "passkey login failed")
 		return
@@ -273,7 +281,7 @@ func (h *Admin) PasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	user := webAuthnUser.User
 	if user.Disabled {
-		h.loginFailures.RecordFailure(loginKey)
+		h.recordPasskeyLoginFailure(loginKey)
 		h.auditFailedLogin(r, user.Email, user.ID)
 		writeJSONError(w, http.StatusUnauthorized, "passkey login failed")
 		return
@@ -289,6 +297,9 @@ func (h *Admin) PasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {
 		h.logger.Warn("update passkey credential", "error", err, "user_id", user.ID)
 	}
 	h.loginFailures.RecordSuccess(loginKey)
+	if h.metrics != nil {
+		h.metrics.RecordLoginSuccess()
+	}
 	if err := h.createAdminSession(w, r, user); err != nil {
 		writeJSONError(w, http.StatusServiceUnavailable, "passkey login is unavailable")
 		return
@@ -320,6 +331,17 @@ func (h *Admin) createAdminSession(w http.ResponseWriter, r *http.Request, user 
 		SameSite: http.SameSiteLaxMode,
 	})
 	return nil
+}
+
+func (h *Admin) recordPasskeyLoginFailure(loginKey string) {
+	locked := h.loginFailures.RecordFailure(loginKey)
+	if h.metrics == nil {
+		return
+	}
+	h.metrics.RecordLoginFailure()
+	if locked {
+		h.metrics.RecordLoginLockoutTransition()
+	}
 }
 
 // Logout explains one unit of behavior in this package.
@@ -505,27 +527,30 @@ func (t *loginFailureTracker) IsLocked(key string) bool {
 
 // RecordFailure explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
-func (t *loginFailureTracker) RecordFailure(key string) {
+func (t *loginFailureTracker) RecordFailure(key string) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	now := t.now()
 	entry := t.entries[key]
 	if now.Before(entry.lockedUntil) {
-		return
+		return false
 	}
 	if entry.firstFailed.IsZero() || now.Sub(entry.firstFailed) > t.window {
 		entry.firstFailed = now
 		entry.failures = 1
 		entry.lockedUntil = time.Time{}
 		t.entries[key] = entry
-		return
+		return false
 	}
 	entry.failures++
+	locked := false
 	if entry.failures >= t.threshold {
 		entry.lockedUntil = now.Add(t.duration)
+		locked = true
 	}
 	t.entries[key] = entry
+	return locked
 }
 
 // RecordSuccess explains one unit of behavior in this package.

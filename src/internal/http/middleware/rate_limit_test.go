@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"kcnotes/internal/observability"
 )
 
 // TestFixedWindowLimiter explains one unit of behavior in this package.
@@ -37,7 +39,7 @@ func TestLoginRateLimitBlocksAccount(t *testing.T) {
 	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
-	h := LoginRateLimit(l, nil)(next)
+	h := LoginRateLimit(l, nil, nil)(next)
 
 	req1 := httptest.NewRequest(http.MethodPost, "/admin/login", strings.NewReader("email=test@example.com"))
 	req1.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -55,6 +57,38 @@ func TestLoginRateLimitBlocksAccount(t *testing.T) {
 	h.ServeHTTP(res2, req2)
 	if res2.Code != http.StatusTooManyRequests {
 		t.Fatalf("req2 status = %d", res2.Code)
+	}
+}
+
+func TestRateLimitDenialsUpdateMetrics(t *testing.T) {
+	metrics := observability.NewMetrics()
+	loginLimiter := NewFixedWindowLimiter(1, time.Minute)
+	sensitiveLimiter := NewFixedWindowLimiter(1, time.Minute)
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	loginHandler := LoginRateLimit(loginLimiter, nil, metrics)(next)
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/admin/login", strings.NewReader("email=test@example.com"))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.RemoteAddr = "10.0.0.1:1234"
+		loginHandler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	sensitiveHandler := SensitiveRateLimit(sensitiveLimiter, nil, metrics)(next)
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/admin/users", nil)
+		req.RemoteAddr = "10.0.0.1:1234"
+		sensitiveHandler.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	snapshot := metrics.Snapshot()
+	if snapshot.RateLimitLoginIP != 1 {
+		t.Fatalf("login IP denials = %d, want 1", snapshot.RateLimitLoginIP)
+	}
+	if snapshot.RateLimitSensitive != 1 {
+		t.Fatalf("sensitive denials = %d, want 1", snapshot.RateLimitSensitive)
 	}
 }
 

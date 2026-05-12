@@ -10,6 +10,8 @@ package handlers
 import (
 	"testing"
 	"time"
+
+	"kcnotes/internal/observability"
 )
 
 // TestLoginFailureTrackerLocksAfterThreshold explains one unit of behavior in this package.
@@ -28,7 +30,9 @@ func TestLoginFailureTrackerLocksAfterThreshold(t *testing.T) {
 		t.Fatalf("expected key unlocked before threshold")
 	}
 
-	tracker.RecordFailure(key)
+	if locked := tracker.RecordFailure(key); !locked {
+		t.Fatalf("expected threshold failure to report a new lockout")
+	}
 	if !tracker.IsLocked(key) {
 		t.Fatalf("expected key locked at threshold")
 	}
@@ -36,6 +40,27 @@ func TestLoginFailureTrackerLocksAfterThreshold(t *testing.T) {
 	now = now.Add(16 * time.Minute)
 	if tracker.IsLocked(key) {
 		t.Fatalf("expected lock to expire")
+	}
+}
+
+func TestAdminRecordsLoginFailureMetrics(t *testing.T) {
+	t.Parallel()
+
+	metrics := observability.NewMetrics()
+	admin := &Admin{
+		loginFailures: newLoginFailureTracker(2, time.Minute, time.Minute),
+		metrics:       metrics,
+	}
+
+	admin.recordPasskeyLoginFailure("10.0.0.1")
+	admin.recordPasskeyLoginFailure("10.0.0.1")
+
+	snapshot := metrics.Snapshot()
+	if snapshot.LoginFailure != 2 {
+		t.Fatalf("login failures = %d, want 2", snapshot.LoginFailure)
+	}
+	if snapshot.LoginLockoutTransitions != 1 {
+		t.Fatalf("lockout transitions = %d, want 1", snapshot.LoginLockoutTransitions)
 	}
 }
 

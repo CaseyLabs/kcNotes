@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"kcnotes/internal/observability"
 )
 
 type FixedWindowLimiter struct {
@@ -86,16 +88,22 @@ func (l *FixedWindowLimiter) pruneExpired(now time.Time) {
 
 // LoginRateLimit explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
-func LoginRateLimit(limiter *FixedWindowLimiter, ipResolver *ClientIPResolver) func(http.Handler) http.Handler {
+func LoginRateLimit(limiter *FixedWindowLimiter, ipResolver *ClientIPResolver, metrics *observability.Metrics) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := ipResolver.ClientIP(r)
 			if !limiter.Allow("login-ip:" + ip) {
+				if metrics != nil {
+					metrics.RecordRateLimitDenied(observability.RateLimitLoginIP)
+				}
 				WriteError(w, r, http.StatusTooManyRequests, "too many login attempts")
 				return
 			}
 			email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
 			if email != "" && !limiter.Allow("login-account:"+email) {
+				if metrics != nil {
+					metrics.RecordRateLimitDenied(observability.RateLimitLoginAccount)
+				}
 				WriteError(w, r, http.StatusTooManyRequests, "too many login attempts")
 				return
 			}
@@ -106,11 +114,14 @@ func LoginRateLimit(limiter *FixedWindowLimiter, ipResolver *ClientIPResolver) f
 
 // SensitiveRateLimit explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
-func SensitiveRateLimit(limiter *FixedWindowLimiter, ipResolver *ClientIPResolver) func(http.Handler) http.Handler {
+func SensitiveRateLimit(limiter *FixedWindowLimiter, ipResolver *ClientIPResolver, metrics *observability.Metrics) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			key := "sensitive:" + r.Method + ":" + r.URL.Path + ":" + ipResolver.ClientIP(r)
 			if !limiter.Allow(key) {
+				if metrics != nil {
+					metrics.RecordRateLimitDenied(observability.RateLimitSensitive)
+				}
 				WriteError(w, r, http.StatusTooManyRequests, "rate limit exceeded")
 				return
 			}
