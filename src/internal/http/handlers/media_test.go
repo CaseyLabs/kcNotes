@@ -155,6 +155,90 @@ func TestUploadMediaQuotaErrorDoesNotWriteFilesOrMetadata(t *testing.T) {
 	}
 }
 
+func TestUploadMediaSameUserDuplicateDoesNotWriteFilesOrMetadata(t *testing.T) {
+	admin, store, uploadDir := newMediaHandlerTestAdmin(t, 200<<20, 2<<30)
+	data := testPNG(t, 640, 320)
+	first := httptest.NewRecorder()
+	usersHandlerStack(store, http.HandlerFunc(admin.UploadMedia)).ServeHTTP(first, newMediaUploadRequest(t, "hero.png", data))
+	if first.Code != http.StatusOK {
+		t.Fatalf("expected first upload status 200, got %d: %s", first.Code, first.Body.String())
+	}
+	before := mustReadDirCount(t, uploadDir)
+
+	second := httptest.NewRecorder()
+	usersHandlerStack(store, http.HandlerFunc(admin.UploadMedia)).ServeHTTP(second, newMediaUploadRequest(t, "hero-copy.png", data))
+	if second.Code != http.StatusOK {
+		t.Fatalf("expected duplicate upload status 200, got %d: %s", second.Code, second.Body.String())
+	}
+	if !strings.Contains(second.Body.String(), "Media already exists in your library") {
+		t.Fatalf("expected duplicate feedback, got:\n%s", second.Body.String())
+	}
+	if got := mustReadDirCount(t, uploadDir); got != before {
+		t.Fatalf("expected duplicate upload to write no files, before=%d after=%d", before, got)
+	}
+	items, err := store.ListMedia(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("list media: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one media row, got %d", len(items))
+	}
+}
+
+func TestUploadMediaCrossUserDuplicateCreatesLibraryRowWithoutWritingFiles(t *testing.T) {
+	admin, store, uploadDir := newMediaHandlerTestAdmin(t, 200<<20, 2<<30)
+	data := testPNG(t, 640, 320)
+	first := httptest.NewRecorder()
+	usersHandlerStack(store, http.HandlerFunc(admin.UploadMedia)).ServeHTTP(first, newMediaUploadRequest(t, "hero.png", data))
+	if first.Code != http.StatusOK {
+		t.Fatalf("expected first upload status 200, got %d: %s", first.Code, first.Body.String())
+	}
+	before := mustReadDirCount(t, uploadDir)
+	if err := store.CreateUser(context.Background(), domain.User{
+		ID:    "admin-2",
+		Email: "admin2@example.com",
+		Role:  domain.RoleAdmin,
+	}); err != nil {
+		t.Fatalf("create second user: %v", err)
+	}
+	if err := store.CreateSession(context.Background(), "session-2", "admin-2", "csrf-token", time.Now().UTC().Add(time.Hour)); err != nil {
+		t.Fatalf("create second session: %v", err)
+	}
+
+	req := newMediaUploadRequest(t, "hero-shared.png", data)
+	req.Header.Del("Cookie")
+	req.AddCookie(&http.Cookie{Name: "cms_session", Value: "session-2", Path: "/admin"})
+	second := httptest.NewRecorder()
+	usersHandlerStack(store, http.HandlerFunc(admin.UploadMedia)).ServeHTTP(second, req)
+	if second.Code != http.StatusOK {
+		t.Fatalf("expected duplicate upload status 200, got %d: %s", second.Code, second.Body.String())
+	}
+	if !strings.Contains(second.Body.String(), "Media added from existing upload") {
+		t.Fatalf("expected attach feedback, got:\n%s", second.Body.String())
+	}
+	if got := mustReadDirCount(t, uploadDir); got != before {
+		t.Fatalf("expected cross-user duplicate to write no files, before=%d after=%d", before, got)
+	}
+	items, err := store.ListMedia(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("list media: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected two media rows, got %d", len(items))
+	}
+	if items[0].StoredName != items[1].StoredName || items[0].AssetID != items[1].AssetID {
+		t.Fatalf("expected rows to share physical asset, got %#v", items)
+	}
+	userBytes, totalBytes, err := store.MediaUsage(context.Background(), "admin-2")
+	if err != nil {
+		t.Fatalf("media usage: %v", err)
+	}
+	wantUser := items[0].Size + items[0].Variants[0].Size
+	if userBytes != wantUser || totalBytes != wantUser {
+		t.Fatalf("expected logical user and physical total bytes %d, got user=%d total=%d", wantUser, userBytes, totalBytes)
+	}
+}
+
 func newMediaHandlerTestAdmin(t *testing.T, userQuota, totalQuota int64) (*Admin, *storesqlite.AuthStore, string) {
 	t.Helper()
 	store := newMediaHandlerTestStore(t)
@@ -206,6 +290,7 @@ func newMediaHandlerTestStore(t *testing.T) *storesqlite.AuthStore {
 		)`,
 		`CREATE TABLE media (
 			id TEXT PRIMARY KEY,
+			asset_id TEXT,
 			stored_name TEXT NOT NULL,
 			original_name TEXT NOT NULL,
 			mime TEXT NOT NULL,
@@ -216,6 +301,16 @@ func newMediaHandlerTestStore(t *testing.T) *storesqlite.AuthStore {
 			created_by TEXT NOT NULL,
 			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY(created_by) REFERENCES users(id)
+		)`,
+		`CREATE TABLE media_assets (
+			id TEXT PRIMARY KEY,
+			stored_name TEXT NOT NULL UNIQUE,
+			mime TEXT NOT NULL,
+			size INTEGER NOT NULL,
+			sha256 TEXT NOT NULL UNIQUE,
+			width INTEGER NOT NULL DEFAULT 0,
+			height INTEGER NOT NULL DEFAULT 0,
+			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE TABLE media_variants (
 			media_id TEXT NOT NULL,
@@ -282,6 +377,15 @@ func newMediaUploadRequest(t *testing.T, name string, data []byte) *http.Request
 	req.Header.Set("HX-Request", "true")
 	req.AddCookie(&http.Cookie{Name: "cms_session", Value: "session-1", Path: "/admin"})
 	return req
+}
+
+func mustReadDirCount(t *testing.T, path string) int {
+	t.Helper()
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		t.Fatalf("read upload dir: %v", err)
+	}
+	return len(entries)
 }
 
 func testPNG(t *testing.T, width, height int) []byte {

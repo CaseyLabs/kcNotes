@@ -125,12 +125,23 @@ func (h *Admin) UploadMedia(w http.ResponseWriter, r *http.Request) {
 		h.renderMediaUploadError(w, r, user, "invalid image data")
 		return
 	}
+	sum := sha256.Sum256(normalized.Data)
+	uploadSHA := hex.EncodeToString(sum[:])
+
+	if asset, err := h.store.GetMediaAssetBySHA256(r.Context(), uploadSHA); err == nil {
+		h.attachExistingMediaAsset(w, r, user, asset, cleanOriginalName(header.Filename))
+		return
+	} else if !errors.Is(err, storesqlite.ErrNotFound) {
+		h.renderError(w, r, http.StatusInternalServerError, "failed to check media metadata")
+		return
+	}
+
 	variants, err := mediaprocess.BuildVariants(normalized, mediaVariantSpecs)
 	if err != nil {
 		h.renderMediaUploadError(w, r, user, "failed to process image")
 		return
 	}
-	if err := h.enforceMediaQuota(r.Context(), user.ID, processedMediaBytes(normalized, variants)); err != nil {
+	if err := h.enforceMediaQuota(r.Context(), user.ID, processedMediaBytes(normalized, variants), true); err != nil {
 		h.renderMediaUploadError(w, r, user, err.Error())
 		return
 	}
@@ -173,14 +184,14 @@ func (h *Admin) UploadMedia(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	sum := sha256.Sum256(normalized.Data)
 	item := domain.Media{
 		ID:           mediaID,
+		AssetID:      mediaID,
 		StoredName:   storedName,
 		OriginalName: cleanOriginalName(header.Filename),
 		MIME:         mimeType,
 		Size:         int64(len(normalized.Data)),
-		SHA256:       hex.EncodeToString(sum[:]),
+		SHA256:       uploadSHA,
 		Width:        normalized.Width,
 		Height:       normalized.Height,
 		CreatedBy:    user.ID,
@@ -194,6 +205,39 @@ func (h *Admin) UploadMedia(w http.ResponseWriter, r *http.Request) {
 	h.auditEvent(r, user.ID, "media_upload", "media", item.ID)
 
 	h.renderMediaTableAfterAction(w, r, user, "Media uploaded")
+}
+
+func (h *Admin) attachExistingMediaAsset(w http.ResponseWriter, r *http.Request, user domain.User, asset domain.MediaAsset, originalName string) {
+	if _, err := h.store.GetMediaByAssetAndUser(r.Context(), asset.ID, user.ID); err == nil {
+		h.renderMediaTableAfterAction(w, r, user, "Media already exists in your library")
+		return
+	} else if !errors.Is(err, storesqlite.ErrNotFound) {
+		h.renderError(w, r, http.StatusInternalServerError, "failed to check media metadata")
+		return
+	}
+
+	if err := h.enforceMediaQuota(r.Context(), user.ID, assetMediaBytes(asset), false); err != nil {
+		h.renderMediaUploadError(w, r, user, err.Error())
+		return
+	}
+	mediaID, err := randomID()
+	if err != nil {
+		h.renderError(w, r, http.StatusServiceUnavailable, "service unavailable")
+		return
+	}
+	item := domain.Media{
+		ID:           mediaID,
+		AssetID:      asset.ID,
+		OriginalName: originalName,
+		CreatedBy:    user.ID,
+	}
+	if err := h.store.AttachMediaToAsset(r.Context(), item); err != nil {
+		h.renderError(w, r, http.StatusInternalServerError, "failed to save media metadata")
+		return
+	}
+
+	h.auditEvent(r, user.ID, "media_upload", "media", item.ID)
+	h.renderMediaTableAfterAction(w, r, user, "Media added from existing upload")
 }
 
 // MediaFile explains one unit of behavior in this package.
@@ -350,7 +394,7 @@ func removeFiles(paths []string) {
 
 // enforceMediaQuota explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
-func (h *Admin) enforceMediaQuota(ctx context.Context, userID string, incomingBytes int64) error {
+func (h *Admin) enforceMediaQuota(ctx context.Context, userID string, incomingBytes int64, countGlobal bool) error {
 	if incomingBytes <= 0 {
 		return nil
 	}
@@ -364,10 +408,18 @@ func (h *Admin) enforceMediaQuota(ctx context.Context, userID string, incomingBy
 	if h.maxMediaUserB > 0 && userBytes+incomingBytes > h.maxMediaUserB {
 		return fmt.Errorf("user media quota exceeded")
 	}
-	if h.maxMediaTotalB > 0 && totalBytes+incomingBytes > h.maxMediaTotalB {
+	if countGlobal && h.maxMediaTotalB > 0 && totalBytes+incomingBytes > h.maxMediaTotalB {
 		return fmt.Errorf("global media quota exceeded")
 	}
 	return nil
+}
+
+func assetMediaBytes(asset domain.MediaAsset) int64 {
+	total := asset.Size
+	for _, variant := range asset.Variants {
+		total += variant.Size
+	}
+	return total
 }
 
 // cleanOriginalName explains one unit of behavior in this package.

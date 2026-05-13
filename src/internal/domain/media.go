@@ -12,6 +12,7 @@ import "time"
 
 type Media struct {
 	ID           string
+	AssetID      string
 	StoredName   string
 	OriginalName string
 	MIME         string
@@ -22,6 +23,18 @@ type Media struct {
 	CreatedBy    string
 	CreatedAt    time.Time
 	Variants     []MediaVariant
+}
+
+type MediaAsset struct {
+	ID         string
+	StoredName string
+	MIME       string
+	Size       int64
+	SHA256     string
+	Width      int
+	Height     int
+	CreatedAt  time.Time
+	Variants   []MediaVariant
 }
 
 type MediaVariant struct {

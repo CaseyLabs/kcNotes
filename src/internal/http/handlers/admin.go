@@ -83,6 +83,9 @@ type adminStore interface {
 	SoftDeletePost(ctx context.Context, id string, actor domain.User) (bool, error)
 	CreateMedia(ctx context.Context, media domain.Media) error
 	CreateMediaWithVariants(ctx context.Context, media domain.Media, variants []domain.MediaVariant) error
+	AttachMediaToAsset(ctx context.Context, media domain.Media) error
+	GetMediaAssetBySHA256(ctx context.Context, sha256 string) (domain.MediaAsset, error)
+	GetMediaByAssetAndUser(ctx context.Context, assetID, userID string) (domain.Media, error)
 	MediaUsage(ctx context.Context, userID string) (userBytes, totalBytes int64, err error)
 	ListMedia(ctx context.Context, limit int) ([]domain.Media, error)
 	GetMediaByID(ctx context.Context, id string) (domain.Media, error)
