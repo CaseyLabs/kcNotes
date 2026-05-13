@@ -19,6 +19,10 @@ import (
 	"kcnotes/internal/domain"
 )
 
+// ErrMediaAssetExists tells callers that another writer already created the
+// canonical physical asset for this upload hash.
+var ErrMediaAssetExists = errors.New("media asset already exists")
+
 // CreateMedia explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func (s *AuthStore) CreateMedia(ctx context.Context, media domain.Media) error {
@@ -56,13 +60,13 @@ func (s *AuthStore) CreateMediaWithVariants(ctx context.Context, media domain.Me
 			return err
 		}
 		if canonicalAssetID != assetID {
-			return fmt.Errorf("media asset sha256 already exists")
+			return ErrMediaAssetExists
 		}
 		_, err = tx.ExecContext(ctx, `
 			INSERT INTO media(id, asset_id, stored_name, original_name, mime, size, sha256, width, height, created_by)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`, media.ID, assetID, media.StoredName, media.OriginalName, media.MIME, media.Size, media.SHA256, media.Width, media.Height, media.CreatedBy)
-		if isMediaIDConflict(err) {
+		if isMediaIDConflict(err) || isMediaUserAssetConflict(err) {
 			return nil
 		}
 		if err != nil {
@@ -92,13 +96,22 @@ func (s *AuthStore) AttachMediaToAsset(ctx context.Context, media domain.Media) 
 		return fmt.Errorf("attach media to asset: asset id is required")
 	}
 	err := s.retry.ExecRetry(ctx, func() error {
-		_, err := s.db.ExecContext(ctx, `
+		res, err := s.db.ExecContext(ctx, `
 			INSERT INTO media(id, asset_id, stored_name, original_name, mime, size, sha256, width, height, created_by)
 			SELECT ?, media_assets.id, media_assets.stored_name, ?, media_assets.mime, media_assets.size,
 				media_assets.sha256, media_assets.width, media_assets.height, ?
 			FROM media_assets
 			WHERE media_assets.id = ?
 		`, media.ID, media.OriginalName, media.CreatedBy, media.AssetID)
+		if isMediaIDConflict(err) || isMediaUserAssetConflict(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if rows, err := res.RowsAffected(); err == nil && rows == 0 {
+			return ErrNotFound
+		}
 		return err
 	})
 	if err != nil {
@@ -486,4 +499,12 @@ func isMediaIDConflict(err error) bool {
 		return false
 	}
 	return strings.Contains(strings.ToLower(err.Error()), "unique constraint failed: media.id")
+}
+
+func isMediaUserAssetConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique constraint failed: media.created_by, media.asset_id")
 }

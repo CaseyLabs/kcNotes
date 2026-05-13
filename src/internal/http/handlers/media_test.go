@@ -185,6 +185,31 @@ func TestUploadMediaSameUserDuplicateDoesNotWriteFilesOrMetadata(t *testing.T) {
 	}
 }
 
+func TestUploadMediaSameHashRaceReusesCanonicalAsset(t *testing.T) {
+	admin, store, uploadDir := newMediaHandlerTestAdmin(t, 200<<20, 2<<30)
+	admin.store = &raceCreateMediaStore{AuthStore: store}
+	data := testPNG(t, 640, 320)
+
+	res := httptest.NewRecorder()
+	usersHandlerStack(store, http.HandlerFunc(admin.UploadMedia)).ServeHTTP(res, newMediaUploadRequest(t, "hero.png", data))
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected upload race status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if !strings.Contains(res.Body.String(), "Media already exists in your library") {
+		t.Fatalf("expected race feedback, got:\n%s", res.Body.String())
+	}
+	if got := mustReadDirCount(t, uploadDir); got != 0 {
+		t.Fatalf("expected losing upload files to be removed, got %d files", got)
+	}
+	items, err := store.ListMedia(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("list media: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one canonical media row, got %d", len(items))
+	}
+}
+
 func TestUploadMediaCrossUserDuplicateCreatesLibraryRowWithoutWritingFiles(t *testing.T) {
 	admin, store, uploadDir := newMediaHandlerTestAdmin(t, 200<<20, 2<<30)
 	data := testPNG(t, 640, 320)
@@ -237,6 +262,27 @@ func TestUploadMediaCrossUserDuplicateCreatesLibraryRowWithoutWritingFiles(t *te
 	if userBytes != wantUser || totalBytes != wantUser {
 		t.Fatalf("expected logical user and physical total bytes %d, got user=%d total=%d", wantUser, userBytes, totalBytes)
 	}
+}
+
+type raceCreateMediaStore struct {
+	*storesqlite.AuthStore
+}
+
+func (s *raceCreateMediaStore) CreateMediaWithVariants(ctx context.Context, media domain.Media, variants []domain.MediaVariant) error {
+	winner := media
+	winner.ID = "race-winner"
+	winner.AssetID = winner.ID
+	winner.StoredName = winner.ID + filepath.Ext(media.StoredName)
+	winnerVariants := make([]domain.MediaVariant, 0, len(variants))
+	for _, variant := range variants {
+		variant.MediaID = winner.ID
+		variant.StoredName = winner.ID + "-" + variant.Name + filepath.Ext(variant.StoredName)
+		winnerVariants = append(winnerVariants, variant)
+	}
+	if err := s.AuthStore.CreateMediaWithVariants(ctx, winner, winnerVariants); err != nil {
+		return err
+	}
+	return storesqlite.ErrMediaAssetExists
 }
 
 func newMediaHandlerTestAdmin(t *testing.T, userQuota, totalQuota int64) (*Admin, *storesqlite.AuthStore, string) {
@@ -324,6 +370,7 @@ func newMediaHandlerTestStore(t *testing.T) *storesqlite.AuthStore {
 			PRIMARY KEY (media_id, name),
 			FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE CASCADE
 		)`,
+		`CREATE UNIQUE INDEX idx_media_created_by_asset ON media(created_by, asset_id)`,
 		`CREATE TABLE audit_log (
 			id TEXT PRIMARY KEY,
 			actor_user_id TEXT,

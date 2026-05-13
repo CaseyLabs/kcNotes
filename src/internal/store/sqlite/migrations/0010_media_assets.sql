@@ -37,6 +37,23 @@ SET asset_id = (
 )
 WHERE asset_id IS NULL;
 
+DELETE FROM media
+WHERE asset_id IS NOT NULL
+  AND id NOT IN (
+      SELECT id
+      FROM (
+          SELECT
+              id,
+              ROW_NUMBER() OVER (
+                  PARTITION BY created_by, asset_id
+                  ORDER BY created_at ASC, id ASC
+              ) AS rn
+          FROM media
+          WHERE asset_id IS NOT NULL
+      )
+      WHERE rn = 1
+  );
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_media_assets_sha256 ON media_assets(sha256);
 CREATE INDEX IF NOT EXISTS idx_media_asset_id ON media(asset_id);
-CREATE INDEX IF NOT EXISTS idx_media_created_by_asset ON media(created_by, asset_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_media_created_by_asset ON media(created_by, asset_id);

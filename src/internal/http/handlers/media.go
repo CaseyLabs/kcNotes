@@ -198,6 +198,15 @@ func (h *Admin) UploadMedia(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.store.CreateMediaWithVariants(r.Context(), item, storedVariants); err != nil {
 		removeFiles(writtenFiles)
+		if errors.Is(err, storesqlite.ErrMediaAssetExists) {
+			asset, assetErr := h.store.GetMediaAssetBySHA256(r.Context(), uploadSHA)
+			if assetErr != nil {
+				h.renderError(w, r, http.StatusInternalServerError, "failed to check media metadata")
+				return
+			}
+			h.attachExistingMediaAsset(w, r, user, asset, item.OriginalName)
+			return
+		}
 		h.renderError(w, r, http.StatusInternalServerError, "failed to save media metadata")
 		return
 	}
