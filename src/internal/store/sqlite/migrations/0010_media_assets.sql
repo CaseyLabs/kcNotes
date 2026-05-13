@@ -1,8 +1,6 @@
 -- O5 media de-duplication:
 -- - media_assets is the canonical physical file record, unique by normalized SHA-256.
 -- - media rows remain the admin library entries, one per uploader per asset.
--- - existing media rows become their own canonical assets unless another row has the
---   same SHA-256, in which case the earliest row owns the shared asset.
 
 CREATE TABLE IF NOT EXISTS media_assets (
     id TEXT PRIMARY KEY,
@@ -36,23 +34,6 @@ SET asset_id = (
     LIMIT 1
 )
 WHERE asset_id IS NULL;
-
-DELETE FROM media
-WHERE asset_id IS NOT NULL
-  AND id NOT IN (
-      SELECT id
-      FROM (
-          SELECT
-              id,
-              ROW_NUMBER() OVER (
-                  PARTITION BY created_by, asset_id
-                  ORDER BY created_at ASC, id ASC
-              ) AS rn
-          FROM media
-          WHERE asset_id IS NOT NULL
-      )
-      WHERE rn = 1
-  );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_media_assets_sha256 ON media_assets(sha256);
 CREATE INDEX IF NOT EXISTS idx_media_asset_id ON media(asset_id);
