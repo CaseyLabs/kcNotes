@@ -9,6 +9,7 @@ package sqlite
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -558,6 +559,115 @@ func TestMediaStoreCreateWithVariants(t *testing.T) {
 	}
 	if item.Variants[0].StoredName != "m-variants-thumb.png" {
 		t.Fatalf("expected variant stored name, got %s", item.Variants[0].StoredName)
+	}
+}
+
+func TestMediaStoreAttachExistingAssetAndUsage(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newTestAuthStore(t)
+
+	u1 := domain.User{ID: "u-media-owner", Email: "owner@example.com", PasswordHash: "x", Role: domain.RoleEditor}
+	u2 := domain.User{ID: "u-media-sharer", Email: "sharer@example.com", PasswordHash: "x", Role: domain.RoleEditor}
+	mustNoErr(t, store.CreateUser(ctx, u1))
+	mustNoErr(t, store.CreateUser(ctx, u2))
+
+	mustNoErr(t, store.CreateMediaWithVariants(ctx, domain.Media{
+		ID:           "m-original",
+		AssetID:      "m-original",
+		StoredName:   "original.png",
+		OriginalName: "photo.png",
+		MIME:         "image/png",
+		Size:         1000,
+		SHA256:       "shared-sha",
+		Width:        1200,
+		Height:       800,
+		CreatedBy:    u1.ID,
+	}, []domain.MediaVariant{{
+		Name:       "thumb",
+		StoredName: "m-original-thumb.png",
+		MIME:       "image/png",
+		Size:       200,
+		Width:      320,
+		Height:     213,
+	}}))
+
+	asset, err := store.GetMediaAssetBySHA256(ctx, "shared-sha")
+	mustNoErr(t, err)
+	if asset.ID != "m-original" || len(asset.Variants) != 1 {
+		t.Fatalf("expected canonical asset with variant, got %#v", asset)
+	}
+	mustNoErr(t, store.AttachMediaToAsset(ctx, domain.Media{
+		ID:           "m-shared",
+		AssetID:      asset.ID,
+		OriginalName: "photo-again.png",
+		CreatedBy:    u2.ID,
+	}))
+	mustNoErr(t, store.AttachMediaToAsset(ctx, domain.Media{
+		ID:           "m-shared-race",
+		AssetID:      asset.ID,
+		OriginalName: "photo-race.png",
+		CreatedBy:    u2.ID,
+	}))
+
+	shared, err := store.GetMediaByAssetAndUser(ctx, asset.ID, u2.ID)
+	mustNoErr(t, err)
+	if shared.StoredName != "original.png" || shared.OriginalName != "photo-again.png" {
+		t.Fatalf("expected shared row to reuse asset metadata and keep uploader name, got %#v", shared)
+	}
+	if len(shared.Variants) != 1 || shared.Variants[0].StoredName != "m-original-thumb.png" {
+		t.Fatalf("expected shared row to reuse asset variants, got %#v", shared.Variants)
+	}
+
+	userBytes, totalBytes, err := store.MediaUsage(ctx, u2.ID)
+	mustNoErr(t, err)
+	if userBytes != 1200 {
+		t.Fatalf("expected duplicate uploader logical usage 1200, got %d", userBytes)
+	}
+	if totalBytes != 1200 {
+		t.Fatalf("expected global physical usage 1200, got %d", totalBytes)
+	}
+	items, err := store.ListMedia(ctx, 10)
+	mustNoErr(t, err)
+	if len(items) != 2 {
+		t.Fatalf("expected duplicate attach to keep one row per uploader asset, got %d rows", len(items))
+	}
+}
+
+func TestMediaStoreCreateDuplicateSHAReportsAssetConflict(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newTestAuthStore(t)
+
+	user := domain.User{ID: "u-media-race", Email: "race@example.com", PasswordHash: "x", Role: domain.RoleEditor}
+	mustNoErr(t, store.CreateUser(ctx, user))
+	mustNoErr(t, store.CreateMedia(ctx, domain.Media{
+		ID:           "m-race-winner",
+		AssetID:      "m-race-winner",
+		StoredName:   "winner.png",
+		OriginalName: "winner.png",
+		MIME:         "image/png",
+		Size:         1000,
+		SHA256:       "race-sha",
+		Width:        1200,
+		Height:       800,
+		CreatedBy:    user.ID,
+	}))
+
+	err := store.CreateMedia(ctx, domain.Media{
+		ID:           "m-race-loser",
+		AssetID:      "m-race-loser",
+		StoredName:   "loser.png",
+		OriginalName: "loser.png",
+		MIME:         "image/png",
+		Size:         1000,
+		SHA256:       "race-sha",
+		Width:        1200,
+		Height:       800,
+		CreatedBy:    user.ID,
+	})
+	if !errors.Is(err, ErrMediaAssetExists) {
+		t.Fatalf("expected media asset conflict, got %v", err)
 	}
 }
 

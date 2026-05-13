@@ -2,9 +2,6 @@
 -- - Variants are tied to their original media row and removed with it.
 -- - `(media_id, name)` keeps deterministic variants idempotent.
 
-ALTER TABLE media ADD COLUMN width INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE media ADD COLUMN height INTEGER NOT NULL DEFAULT 0;
-
 CREATE TABLE IF NOT EXISTS media_variants (
     media_id TEXT NOT NULL,
     name TEXT NOT NULL,

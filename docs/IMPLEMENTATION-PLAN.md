@@ -377,8 +377,21 @@ public metrics endpoint or external telemetry dependency.
 
 ### O5: Media De-Duplication
 
-- Decide whether `media.sha256` should become unique.
-- If enabled, treat same-hash uploads as reuse or conflict based on UX needs.
+O5 is implemented with one physical media asset per normalized image SHA-256 and
+one media-library row per uploader.
+
+- `media_assets` stores canonical physical file metadata and enforces unique
+  normalized SHA-256 values.
+- `media` rows remain the admin library entries, linked to canonical assets by
+  `asset_id`.
+- Same-user duplicate uploads do not create another row or write another file;
+  the admin UI reports that the media already exists in that user's library.
+- Cross-user duplicate uploads create a new library row that reuses the existing
+  original and variant files.
+- User quota counts the uploader's logical library row, while global quota
+  counts shared physical assets only once.
+- Static publishing and authenticated media previews continue to use the same
+  `/media/{stored_name}` and `/admin/media/files/{id}` contracts.
 
 ### O6: Admin Exposure Extras
 

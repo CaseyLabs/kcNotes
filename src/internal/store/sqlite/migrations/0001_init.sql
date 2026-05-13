@@ -30,17 +30,35 @@ CREATE TABLE IF NOT EXISTS posts (
     FOREIGN KEY(author_id) REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS media_assets (
+    id TEXT PRIMARY KEY,
+    stored_name TEXT NOT NULL UNIQUE,
+    mime TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    sha256 TEXT NOT NULL UNIQUE,
+    width INTEGER NOT NULL DEFAULT 0,
+    height INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS media (
     id TEXT PRIMARY KEY,
+    asset_id TEXT,
     stored_name TEXT NOT NULL,
     original_name TEXT NOT NULL,
     mime TEXT NOT NULL,
     size INTEGER NOT NULL,
     sha256 TEXT NOT NULL,
+    width INTEGER NOT NULL DEFAULT 0,
+    height INTEGER NOT NULL DEFAULT 0,
     created_by TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(created_by) REFERENCES users(id)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_media_assets_sha256 ON media_assets(sha256);
+CREATE INDEX IF NOT EXISTS idx_media_asset_id ON media(asset_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_media_created_by_asset ON media(created_by, asset_id);
 
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
