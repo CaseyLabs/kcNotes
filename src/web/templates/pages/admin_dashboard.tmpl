@@ -14,10 +14,101 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
   <main class="page-main">
     <section class="page-heading">
       <div>
-        <h2 class="page-title">Admin</h2>
+        <p class="section-kicker">Admin workspace</p>
+        <h2 class="page-title">Dashboard</h2>
         <p class="page-lede">{{ .UserEmail }} · {{ .UserRole }}</p>
       </div>
       {{ template "partial-admin-nav" . }}
+    </section>
+
+    <section class="dashboard-grid" aria-label="Dashboard overview">
+      <a class="stat-card focus-ring" href="/admin/posts">
+        <span class="stat-label">Content</span>
+        <strong>{{ .ContentTotal }}</strong>
+        <span class="stat-note">active posts and pages</span>
+      </a>
+      <a class="stat-card focus-ring" href="/admin/posts?status=published">
+        <span class="stat-label">Published</span>
+        <strong>{{ .PublishedTotal }}</strong>
+        <span class="stat-note">visible on the public site</span>
+      </a>
+      <a class="stat-card focus-ring" href="/admin/posts?status=draft">
+        <span class="stat-label">Drafts</span>
+        <strong>{{ .DraftTotal }}</strong>
+        <span class="stat-note">still in progress</span>
+      </a>
+      {{ if .IsAdmin }}
+      <a class="stat-card focus-ring" href="/admin/users">
+        <span class="stat-label">Users</span>
+        <strong>{{ .UserTotal }}</strong>
+        <span class="stat-note">accounts with access</span>
+      </a>
+      {{ else }}
+      <a class="stat-card focus-ring" href="/admin/media">
+        <span class="stat-label">Media</span>
+        <strong>{{ .MediaTotal }}</strong>
+        <span class="stat-note">recent uploads shown</span>
+      </a>
+      {{ end }}
+    </section>
+
+    <section class="dashboard-columns">
+      <div class="panel dashboard-panel">
+        <div class="section-header">
+          <div>
+            <h3>Recent content</h3>
+            <p class="muted">Latest editable posts and pages.</p>
+          </div>
+          <a class="btn btn-secondary btn-sm focus-ring" href="/admin/posts">View all</a>
+        </div>
+        {{ if .RecentPosts }}
+        <ul class="object-list">
+          {{ range .RecentPosts }}
+          <li class="object-list-item">
+            <div>
+              <a class="object-title focus-ring" href="/admin/posts/{{ .ID }}/edit">{{ .Title }}</a>
+              <p class="object-meta">{{ .Type }} · {{ .Slug }} · {{ .UpdatedAt.Format "2006-01-02 15:04" }}</p>
+            </div>
+            <span class="status-pill status-{{ .Status }}">{{ .Status }}</span>
+          </li>
+          {{ end }}
+        </ul>
+        {{ else }}
+        <div class="empty-state empty-state-compact">
+          <h3>No content yet</h3>
+          <p class="text-sm muted">Create the first post or page.</p>
+        </div>
+        {{ end }}
+      </div>
+
+      <div class="panel dashboard-panel">
+        <div class="section-header">
+          <div>
+            <h3>Quick actions</h3>
+            <p class="muted">Common admin tasks.</p>
+          </div>
+        </div>
+        <div class="action-list">
+          <a href="/admin/posts/new" class="action-item focus-ring">
+            <strong>New post</strong>
+            <span>Draft content, publish a page, or start an update.</span>
+          </a>
+          <a href="/admin/media" class="action-item focus-ring">
+            <strong>Upload media</strong>
+            <span>Add images and copy static media paths.</span>
+          </a>
+          <a href="/admin/passkeys" class="action-item focus-ring">
+            <strong>Manage passkeys</strong>
+            <span>Add or rename your sign-in credentials.</span>
+          </a>
+          {{ if .IsAdmin }}
+          <a href="/admin/users" class="action-item focus-ring">
+            <strong>Invite user</strong>
+            <span>Create a single-use enrollment link.</span>
+          </a>
+          {{ end }}
+        </div>
+      </div>
     </section>
 
     <section class="admin-action-strip">

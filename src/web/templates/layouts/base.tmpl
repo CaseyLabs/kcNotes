@@ -19,7 +19,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
     {{ if .CanonicalURL }}<link rel="canonical" href="{{ .CanonicalURL }}" />{{ end }}
     {{ if .CSRFToken }}<meta name="csrf-token" content="{{ .CSRFToken }}" />{{ end }}
     <link rel="stylesheet" href="{{ if .AssetBase }}{{ .AssetBase }}{{ else }}/static{{ end }}/css/app.css" />
-    <script src="{{ if .AssetBase }}{{ .AssetBase }}{{ else }}/static{{ end }}/js/vendor/htmx-2.0.9.min.js"></script>
+    <script src="{{ if .AssetBase }}{{ .AssetBase }}{{ else }}/static{{ end }}/js/vendor/htmx-2.0.10.min.js"></script>
     <script src="{{ if .AssetBase }}{{ .AssetBase }}{{ else }}/static{{ end }}/js/app.js" defer></script>
   </head>
   <body>

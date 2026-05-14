@@ -11,9 +11,9 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 
 {{ define "partial-audit-table" }}
 <section id="audit-table" class="space-y-4">
-  <form class="panel grid gap-3 md:grid-cols-4" hx-get="/admin/audit/table" hx-target="#audit-table" hx-swap="outerHTML">
+  <form class="filter-panel filter-panel-compact" hx-get="/admin/audit/table" hx-target="#audit-table" hx-swap="outerHTML">
     <input type="hidden" name="page" value="1" />
-    <label class="md:col-span-2 text-sm muted">
+    <label class="filter-search text-sm muted">
       Search
       <input class="input focus-ring" type="search" name="q" value="{{ .Query }}" placeholder="email, action, entity, id, ip" />
     </label>
@@ -29,8 +29,9 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
         <option value="100" {{ if eq .PageSize 100 }}selected{{ end }}>100</option>
       </select>
     </label>
-    <div class="md:col-span-4">
+    <div class="filter-actions">
       <button type="submit" class="btn btn-primary focus-ring">Apply</button>
+      <a class="btn btn-secondary focus-ring" href="/admin/audit" hx-get="/admin/audit/table" hx-target="#audit-table" hx-swap="outerHTML">Reset</a>
     </div>
   </form>
 
@@ -72,7 +73,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
     </table>
   </div>
 
-  <div class="flex items-center justify-between text-sm muted">
+  <div class="pagination-bar">
     <p>Total: {{ .Total }} records</p>
     <div class="flex items-center gap-2">
       {{ if .HasPrevPage }}

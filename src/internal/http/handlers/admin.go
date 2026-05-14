@@ -146,11 +146,61 @@ func NewAdmin(renderer *views.Renderer, logger *slog.Logger, store adminStore, c
 func (h *Admin) Dashboard(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	user, _ := middleware.CurrentUser(r)
+	postFilter := storesqlite.PostListFilter{Page: 1, PageSize: 5}
+	if user.Role == domain.RoleAuthor {
+		postFilter.AuthorID = user.ID
+	}
+	recentPosts, contentTotal, err := h.store.ListPosts(r.Context(), postFilter)
+	if err != nil {
+		h.renderError(w, r, http.StatusInternalServerError, "failed to load dashboard")
+		return
+	}
+	_, publishedTotal, err := h.store.ListPosts(r.Context(), storesqlite.PostListFilter{
+		Status:   domain.PostStatusPublished,
+		Page:     1,
+		PageSize: 1,
+		AuthorID: postFilter.AuthorID,
+	})
+	if err != nil {
+		h.renderError(w, r, http.StatusInternalServerError, "failed to load dashboard")
+		return
+	}
+	_, draftTotal, err := h.store.ListPosts(r.Context(), storesqlite.PostListFilter{
+		Status:   domain.PostStatusDraft,
+		Page:     1,
+		PageSize: 1,
+		AuthorID: postFilter.AuthorID,
+	})
+	if err != nil {
+		h.renderError(w, r, http.StatusInternalServerError, "failed to load dashboard")
+		return
+	}
+	media, err := h.store.ListMedia(r.Context(), 4)
+	if err != nil {
+		h.renderError(w, r, http.StatusInternalServerError, "failed to load dashboard")
+		return
+	}
+	userTotal := 0
+	if user.Role == domain.RoleAdmin {
+		userTotal, err = h.store.CountUsers(r.Context())
+		if err != nil {
+			h.renderError(w, r, http.StatusInternalServerError, "failed to load dashboard")
+			return
+		}
+	}
 	_ = h.renderer.Render(w, "admin-dashboard", map[string]any{
-		"Title":     "Admin Dashboard",
-		"CSRFToken": middleware.CSRFToken(r),
-		"UserEmail": user.Email,
-		"UserRole":  string(user.Role),
+		"Title":          "Admin Dashboard",
+		"CSRFToken":      middleware.CSRFToken(r),
+		"UserEmail":      user.Email,
+		"UserRole":       string(user.Role),
+		"IsAdmin":        user.Role == domain.RoleAdmin,
+		"RecentPosts":    recentPosts,
+		"RecentMedia":    media,
+		"ContentTotal":   contentTotal,
+		"PublishedTotal": publishedTotal,
+		"DraftTotal":     draftTotal,
+		"MediaTotal":     len(media),
+		"UserTotal":      userTotal,
 	})
 }
 

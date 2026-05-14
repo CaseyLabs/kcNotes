@@ -14,10 +14,11 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
   <main class="page-main">
     <section class="page-heading">
       <div>
+        <p class="section-kicker">Editor</p>
         <h2 class="page-title">{{ .Title }}</h2>
         <p class="page-lede">Write in Markdown.</p>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="page-actions">
         {{ template "partial-admin-nav" . }}
         <a href="/admin/posts" class="btn btn-secondary focus-ring">Back to Posts</a>
       </div>

@@ -10,7 +10,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 */}}
 
 {{ define "partial-post-form" }}
-<div id="post-form-panel" class="panel">
+<div id="post-form-panel" class="panel editor-panel">
   {{ if .AutosaveSnapshot }}
     <div class="flash-warning mb-4" id="autosave-recovery">
       <p>A newer autosave is available for this editor.</p>
@@ -31,11 +31,11 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
       {{ range .FormErrors }}<p>{{ . }}</p>{{ end }}
     </div>
   {{ end }}
-  <form class="space-y-4" method="post" action="{{ .FormAction }}" {{ if .IsEdit }}hx-post="/admin/posts/{{ .Form.ID }}/autosave" hx-trigger="input changed delay:4s, change changed delay:4s" hx-target="#autosave-status" hx-swap="outerHTML" hx-indicator="#autosave-saving"{{ end }}>
+  <form class="editor-form" method="post" action="{{ .FormAction }}" {{ if .IsEdit }}hx-post="/admin/posts/{{ .Form.ID }}/autosave" hx-trigger="input changed delay:4s, change changed delay:4s" hx-target="#autosave-status" hx-swap="outerHTML" hx-indicator="#autosave-saving"{{ end }}>
     <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
     {{ if .IsEdit }}<input type="hidden" name="base_updated_at" value="{{ .Form.BaseUpdatedAt }}" />{{ end }}
 
-    <div class="grid gap-4 md:grid-cols-3">
+    <div class="editor-meta-grid">
       <label class="text-sm muted">
         Type
         <select class="select focus-ring" name="type" required>
@@ -59,7 +59,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 
     <label class="block text-sm muted">
       Title
-      <input class="input focus-ring" type="text" name="title" value="{{ .Form.Title }}" maxlength="160" required />
+      <input class="input input-title focus-ring" type="text" name="title" value="{{ .Form.Title }}" maxlength="160" required />
     </label>
 
     <label class="block text-sm muted">
@@ -67,12 +67,16 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
       <textarea class="textarea focus-ring" name="body_md">{{ .Form.BodyMD }}</textarea>
     </label>
 
-    <div class="flex flex-wrap gap-2">
-      <button class="btn btn-primary focus-ring" type="submit">{{ .SubmitLabel }}</button>
-      <a href="/admin/posts" class="btn btn-secondary focus-ring">Cancel</a>
+    <div class="editor-actions">
+      <div class="flex flex-wrap gap-2">
+        <button class="btn btn-primary focus-ring" type="submit">{{ .SubmitLabel }}</button>
+        <a href="/admin/posts" class="btn btn-secondary focus-ring">Cancel</a>
+      </div>
       {{ if .IsEdit }}
-        <span id="autosave-status" class="muted self-center text-sm"></span>
-        <span id="autosave-saving" class="htmx-indicator muted self-center text-sm">Saving...</span>
+        <div class="autosave-cluster" aria-live="polite">
+          <span id="autosave-status" class="muted text-sm"></span>
+          <span id="autosave-saving" class="htmx-indicator muted text-sm">Saving...</span>
+        </div>
       {{ end }}
     </div>
   </form>

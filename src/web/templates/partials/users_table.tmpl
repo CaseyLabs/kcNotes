@@ -64,9 +64,9 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
           {{ range .Users }}
           <tr>
             <td class="px-4 py-3 text-[var(--color-text)]">{{ .Email }}</td>
-            <td class="px-4 py-3 text-[var(--color-text)]">{{ .Role }}</td>
+            <td class="px-4 py-3"><span class="type-pill">{{ .Role }}</span></td>
             <td class="px-4 py-3 text-[var(--color-text)]">{{ if .Disabled }}yes{{ else }}no{{ end }}</td>
-            <td class="px-4 py-3 text-[var(--color-text)]">{{ if .Disabled }}pending/disabled{{ else }}active{{ end }}</td>
+            <td class="px-4 py-3">{{ if .Disabled }}<span class="status-pill status-archived">pending/disabled</span>{{ else }}<span class="status-pill status-published">active</span>{{ end }}</td>
             <td class="px-4 py-3">
               <form class="flex flex-wrap items-center gap-2" hx-post="/admin/users/{{ .ID }}/update" hx-target="#users-table" hx-swap="outerHTML">
                 <input type="hidden" name="_csrf" value="{{ $.CSRFToken }}" />

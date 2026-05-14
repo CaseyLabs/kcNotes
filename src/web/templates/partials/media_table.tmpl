@@ -14,10 +14,14 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 <div id="flash" hx-swap-oob="true" class="flash-warning mb-4">{{ .FlashMessage }}</div>
 {{ end }}
 <section id="media-table" class="space-y-4">
-  <form class="panel" hx-post="/admin/media" hx-encoding="multipart/form-data" hx-target="#media-table" hx-swap="outerHTML">
+  <form class="upload-panel" hx-post="/admin/media" hx-encoding="multipart/form-data" hx-target="#media-table" hx-swap="outerHTML">
     <input type="hidden" name="_csrf" value="{{ .CSRFToken }}" />
-    <div class="grid gap-3 md:grid-cols-4">
-      <label class="text-sm muted md:col-span-3">
+    <div>
+      <h3>Upload image</h3>
+      <p class="muted">PNG, JPEG, or GIF. Images are validated and variants are generated automatically.</p>
+    </div>
+    <div class="upload-controls">
+      <label class="text-sm muted">
         Image file (PNG/JPEG/GIF, max 10 MiB)
         <input class="input focus-ring" type="file" name="file" accept="image/png,image/jpeg,image/gif" required />
       </label>
@@ -26,6 +30,26 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
       </div>
     </div>
   </form>
+
+  {{ if .Media }}
+  <div class="media-grid" aria-label="Recent media">
+    {{ range .Media }}
+    <article class="media-card">
+      <a class="media-thumb focus-ring" href="/admin/media/files/{{ .ID }}" target="_blank" rel="noreferrer">
+        <img src="/admin/media/files/{{ .ID }}/variants/thumb" alt="{{ .OriginalName }}" loading="lazy" decoding="async" />
+      </a>
+      <div class="media-card-body">
+        <h3>{{ .OriginalName }}</h3>
+        <p class="muted">{{ .Width }} x {{ .Height }} · {{ .Size }} bytes</p>
+        <div class="copy-field copy-field-compact">
+          <code class="copy-field-value">/media/{{ .StoredName }}</code>
+          <button type="button" class="btn btn-secondary btn-xs focus-ring" data-copy-value="/media/{{ .StoredName }}">Copy</button>
+        </div>
+      </div>
+    </article>
+    {{ end }}
+  </div>
+  {{ end }}
 
   <div class="table-wrap">
     <table class="data-table min-w-[920px] divide-y divide-[var(--color-border)]">

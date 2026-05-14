@@ -109,6 +109,12 @@ func TestUploadMediaStoresOriginalVariantsAndMetadata(t *testing.T) {
 	if item.Variants[0].Name != "thumb" || item.Variants[0].Width != 320 || item.Variants[0].Height != 160 {
 		t.Fatalf("unexpected variant metadata: %#v", item.Variants[0])
 	}
+	if !strings.Contains(body, `src="/admin/media/files/`+item.ID+`/variants/thumb"`) {
+		t.Fatalf("expected media grid to use thumbnail variant, got:\n%s", body)
+	}
+	if strings.Contains(body, `src="/admin/media/files/`+item.ID+`"`) {
+		t.Fatalf("expected media grid image not to load original upload, got:\n%s", body)
+	}
 	if _, err := os.Stat(filepath.Join(uploadDir, item.StoredName)); err != nil {
 		t.Fatalf("expected original file: %v", err)
 	}
@@ -123,6 +129,52 @@ func TestUploadMediaStoresOriginalVariantsAndMetadata(t *testing.T) {
 	wantBytes := item.Size + item.Variants[0].Size
 	if userBytes != wantBytes || totalBytes != wantBytes {
 		t.Fatalf("expected quota usage %d, got user=%d total=%d", wantBytes, userBytes, totalBytes)
+	}
+}
+
+func TestMediaVariantFileServesGeneratedThumbnail(t *testing.T) {
+	admin, store, uploadDir := newMediaHandlerTestAdmin(t, 200<<20, 2<<30)
+	upload := httptest.NewRecorder()
+	usersHandlerStack(store, http.HandlerFunc(admin.UploadMedia)).ServeHTTP(upload, newMediaUploadRequest(t, "hero.png", testPNG(t, 640, 320)))
+	if upload.Code != http.StatusOK {
+		t.Fatalf("expected upload status 200, got %d: %s", upload.Code, upload.Body.String())
+	}
+	items, err := store.ListMedia(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("list media: %v", err)
+	}
+	if len(items) != 1 || len(items[0].Variants) != 1 {
+		t.Fatalf("expected one media item with one variant, got %#v", items)
+	}
+	item := items[0]
+	variant := item.Variants[0]
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/media/files/"+item.ID+"/variants/thumb", nil)
+	req.SetPathValue("id", item.ID)
+	req.SetPathValue("name", "thumb")
+	req.AddCookie(&http.Cookie{Name: "cms_session", Value: "session-1", Path: "/admin"})
+	res := httptest.NewRecorder()
+	usersHandlerStack(store, http.HandlerFunc(admin.MediaVariantFile)).ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if got := res.Header().Get("Content-Type"); got != "image/png" {
+		t.Fatalf("expected image/png content type, got %s", got)
+	}
+	wantVariant, err := os.ReadFile(filepath.Join(uploadDir, variant.StoredName))
+	if err != nil {
+		t.Fatalf("read variant: %v", err)
+	}
+	if !bytes.Equal(res.Body.Bytes(), wantVariant) {
+		t.Fatalf("expected response body to be thumbnail variant bytes")
+	}
+	original, err := os.ReadFile(filepath.Join(uploadDir, item.StoredName))
+	if err != nil {
+		t.Fatalf("read original: %v", err)
+	}
+	if bytes.Equal(res.Body.Bytes(), original) {
+		t.Fatalf("expected thumbnail response to differ from original upload bytes")
 	}
 }
 

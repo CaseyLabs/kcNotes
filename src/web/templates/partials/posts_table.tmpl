@@ -14,9 +14,9 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 <div id="flash" hx-swap-oob="true" class="flash-success mb-4">{{ .FlashMessage }}</div>
 {{ end }}
 <section id="posts-table" class="space-y-4">
-  <form class="panel grid gap-3 md:grid-cols-6" hx-get="/admin/posts/table" hx-target="#posts-table" hx-swap="outerHTML">
+  <form class="filter-panel" hx-get="/admin/posts/table" hx-target="#posts-table" hx-swap="outerHTML">
     <input type="hidden" name="page" value="1" />
-    <label class="md:col-span-2 text-sm muted">
+    <label class="filter-search text-sm muted">
       Search
       <input class="input focus-ring" type="search" name="q" value="{{ .Query }}" placeholder="title, slug, body" />
     </label>
@@ -57,8 +57,9 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
         <option value="50" {{ if eq .PageSize 50 }}selected{{ end }}>50</option>
       </select>
     </label>
-    <div class="md:col-span-6">
+    <div class="filter-actions">
       <button type="submit" class="btn btn-primary focus-ring">Apply</button>
+      <a class="btn btn-secondary focus-ring" href="/admin/posts" hx-get="/admin/posts/table" hx-target="#posts-table" hx-swap="outerHTML">Reset</a>
     </div>
   </form>
 
@@ -94,7 +95,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
     </table>
   </div>
 
-  <div class="flex items-center justify-between text-sm muted">
+  <div class="pagination-bar">
     <p>Total: {{ .Total }} records</p>
     <div class="flex items-center gap-2">
       {{ if .HasPrevPage }}
@@ -112,10 +113,13 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
 {{ define "partial-post-row" }}
 {{ $post := . }}
 <tr id="row-{{ $post.ID }}" class="align-top">
-  <td class="px-4 py-3 font-medium text-[var(--color-text)]">{{ $post.Title }}</td>
-  <td class="px-4 py-3 text-[var(--color-text)]">{{ $post.Slug }}</td>
-  <td class="px-4 py-3 text-[var(--color-text)]">{{ $post.Type }}</td>
-  <td class="px-4 py-3 text-[var(--color-text)]">{{ $post.Status }}</td>
+  <td class="px-4 py-3">
+    <a class="font-medium text-[var(--color-text)] hover:underline focus-ring" href="/admin/posts/{{ $post.ID }}/edit">{{ $post.Title }}</a>
+    <p class="mt-1 text-xs muted">Updated {{ $post.UpdatedAt.Format "2006-01-02 15:04" }}</p>
+  </td>
+  <td class="px-4 py-3 font-mono text-xs text-[var(--color-text)]">{{ $post.Slug }}</td>
+  <td class="px-4 py-3"><span class="type-pill">{{ $post.Type }}</span></td>
+  <td class="px-4 py-3"><span class="status-pill status-{{ $post.Status }}">{{ $post.Status }}</span></td>
   <td class="px-4 py-3 muted">{{ $post.UpdatedAt.Format "2006-01-02 15:04" }}</td>
   <td class="px-4 py-3">
     <div class="flex flex-wrap gap-2">

@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"kcnotes/internal/domain"
 	"kcnotes/internal/http/middleware"
@@ -276,7 +277,47 @@ func (h *Admin) MediaFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	targetPath := filepath.Join(h.uploadDir, media.StoredName)
+	h.serveUploadedMedia(w, r, media.StoredName, media.MIME, media.OriginalName, media.CreatedAt)
+}
+
+// MediaVariantFile serves a generated media variant, such as the thumbnail used
+// by the admin media grid, without streaming the original upload into each card.
+func (h *Admin) MediaVariantFile(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	name := strings.TrimSpace(r.PathValue("name"))
+	if id == "" || name == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	media, err := h.store.GetMediaByID(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, storesqlite.ErrNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		h.renderError(w, r, http.StatusInternalServerError, "failed to load media")
+		return
+	}
+	variant, ok := mediaVariantByName(media, name)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	if !isAllowedMediaType(variant.MIME) {
+		h.renderError(w, r, http.StatusForbidden, "unsupported media type")
+		return
+	}
+	if filepath.Base(variant.StoredName) != variant.StoredName {
+		h.renderError(w, r, http.StatusBadRequest, "invalid media path")
+		return
+	}
+
+	h.serveUploadedMedia(w, r, variant.StoredName, variant.MIME, media.OriginalName, variant.CreatedAt)
+}
+
+func (h *Admin) serveUploadedMedia(w http.ResponseWriter, r *http.Request, storedName, mimeType, originalName string, createdAt time.Time) {
+	targetPath := filepath.Join(h.uploadDir, storedName)
 	data, err := os.ReadFile(targetPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -287,10 +328,10 @@ func (h *Admin) MediaFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", media.MIME)
+	w.Header().Set("Content-Type", mimeType)
 	w.Header().Set("Cache-Control", "private, max-age=0, no-store")
-	w.Header().Set("Content-Disposition", contentDispositionInline(media.OriginalName))
-	http.ServeContent(w, r, media.OriginalName, media.CreatedAt, bytes.NewReader(data))
+	w.Header().Set("Content-Disposition", contentDispositionInline(originalName))
+	http.ServeContent(w, r, originalName, createdAt, bytes.NewReader(data))
 }
 
 // renderMediaUploadError explains one unit of behavior in this package.
@@ -385,6 +426,15 @@ func isAllowedMediaType(mimeType string) bool {
 
 func mediaVariantStoredName(mediaID, variantName, ext string) string {
 	return mediaID + "-" + variantName + ext
+}
+
+func mediaVariantByName(media domain.Media, name string) (domain.MediaVariant, bool) {
+	for _, variant := range media.Variants {
+		if variant.Name == name {
+			return variant, true
+		}
+	}
+	return domain.MediaVariant{}, false
 }
 
 func processedMediaBytes(original mediaprocess.ProcessedImage, variants []mediaprocess.Variant) int64 {
