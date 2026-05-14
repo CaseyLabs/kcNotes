@@ -73,6 +73,14 @@ func (h *Public) Healthz(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ok"))
 }
 
+// RobotsTXT gives crawlers explicit guidance that admin URLs are not public
+// content. Authentication remains the real access-control boundary.
+func (h *Public) RobotsTXT(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("User-agent: *\nDisallow: /admin\nDisallow: /admin/\n"))
+}
+
 // Post explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func (h *Public) Post(w http.ResponseWriter, r *http.Request) {

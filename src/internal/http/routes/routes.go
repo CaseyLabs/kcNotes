@@ -35,6 +35,7 @@ type Router struct {
 func New(public *handlers.Public, admin *handlers.Admin, staticDir string, mw MiddlewareSet) *Router {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", public.Healthz)
+	mux.HandleFunc("GET /robots.txt", public.RobotsTXT)
 	mux.HandleFunc("GET /{$}", public.Home)
 	mux.HandleFunc("GET /p/{slug}", redirectToTrailingSlash)
 	mux.HandleFunc("GET /page/{slug}", redirectToTrailingSlash)

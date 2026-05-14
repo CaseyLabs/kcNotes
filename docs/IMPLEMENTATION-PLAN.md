@@ -395,9 +395,11 @@ one media-library row per uploader.
 
 ### O6: Admin Exposure Extras
 
-- Optional admin IP allowlist.
-- Explicit `/robots.txt` rules blocking admin paths if static/public serving is
-  expanded.
+O6 is implemented as crawler guidance without adding IP allowlisting.
+
+- `GET /robots.txt` returns explicit `Disallow` rules for admin paths.
+- Admin exposure remains controlled by passkey-only auth, sessions, CSRF, RBAC,
+  rate limits, and existing trusted-proxy-aware client IP handling.
 
 ## Verification Plan
 
