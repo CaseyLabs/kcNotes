@@ -252,6 +252,26 @@ document.body.addEventListener("click", function (event) {
     });
 });
 
+function initializeAdminNavigationState() {
+  var links = document.querySelectorAll(".admin-nav a[href]");
+  var currentPath = window.location.pathname.replace(/\/+$/g, "") || "/";
+  links.forEach(function (link) {
+    var linkPath =
+      new URL(
+        link.getAttribute("href"),
+        window.location.origin
+      ).pathname.replace(/\/+$/g, "") || "/";
+    var active =
+      currentPath === linkPath ||
+      (linkPath !== "/admin" && currentPath.indexOf(linkPath + "/") === 0);
+    if (!active) {
+      return;
+    }
+    link.classList.add("admin-link-current");
+    link.setAttribute("aria-current", "page");
+  });
+}
+
 function passkeysAvailable() {
   return !!(window.PublicKeyCredential && navigator.credentials);
 }
@@ -372,6 +392,8 @@ bindPasskeyRegistration(
   "/admin/passkeys/finish",
   "/admin/passkeys"
 );
+
+initializeAdminNavigationState();
 
 /*
   THEME MANAGEMENT OVERVIEW:

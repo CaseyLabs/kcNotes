@@ -14,10 +14,11 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
   <main class="page-main">
     <section class="page-heading">
       <div>
+        <p class="section-kicker">Content library</p>
         <h2 class="page-title">Posts & Pages</h2>
         <p class="page-lede">Search, filter, and manage content.</p>
       </div>
-      <div class="flex flex-col items-stretch gap-2 sm:items-end">
+      <div class="page-actions">
         {{ template "partial-admin-nav" . }}
         <a href="/admin/posts/new" class="btn btn-primary focus-ring">New Post</a>
       </div>
