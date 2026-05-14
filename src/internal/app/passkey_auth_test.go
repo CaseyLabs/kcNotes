@@ -78,6 +78,32 @@ func TestMFARouteUnavailable(t *testing.T) {
 	}
 }
 
+func TestRobotsTXTDisallowsAdminPaths(t *testing.T) {
+	application := newTestApp(t)
+	router := application.Router()
+
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/robots.txt", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("/robots.txt status = %d", res.Code)
+	}
+	if got := res.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
+		t.Fatalf("/robots.txt content type = %q", got)
+	}
+	body := res.Body.String()
+	for _, want := range []string{"User-agent: *", "Disallow: /admin", "Disallow: /admin/"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("/robots.txt missing %q in %q", want, body)
+		}
+	}
+
+	adminRes := httptest.NewRecorder()
+	router.ServeHTTP(adminRes, httptest.NewRequest(http.MethodGet, "/admin/login", nil))
+	if adminRes.Code != http.StatusOK {
+		t.Fatalf("admin login should remain reachable, status = %d", adminRes.Code)
+	}
+}
+
 func newTestApp(t *testing.T) *App {
 	t.Helper()
 	t.Chdir(filepath.Join("..", ".."))

@@ -72,6 +72,7 @@ Maintenance commands:
 ## Public Routes
 
 - Health: `http://localhost:5555/healthz`
+- Robots guidance: `http://localhost:5555/robots.txt`
 - Home: `http://localhost:5555/`
 - Post: `http://localhost:5555/p/{slug}/`
 - Page: `http://localhost:5555/page/{slug}/`
