@@ -36,7 +36,7 @@ TEACHING NOTES (Go HTML Templates + HTMX-friendly rendering):
     {{ range .Media }}
     <article class="media-card">
       <a class="media-thumb focus-ring" href="/admin/media/files/{{ .ID }}" target="_blank" rel="noreferrer">
-        <img src="/admin/media/files/{{ .ID }}" alt="{{ .OriginalName }}" loading="lazy" />
+        <img src="/admin/media/files/{{ .ID }}/variants/thumb" alt="{{ .OriginalName }}" loading="lazy" decoding="async" />
       </a>
       <div class="media-card-body">
         <h3>{{ .OriginalName }}</h3>

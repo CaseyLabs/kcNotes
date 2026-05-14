@@ -83,6 +83,7 @@ func New(public *handlers.Public, admin *handlers.Admin, staticDir string, mw Mi
 	mux.Handle("GET /admin/media", mw.RequireAuth(mw.CSRF(http.HandlerFunc(admin.MediaPage))))
 	mux.Handle("GET /admin/media/table", mw.RequireAuth(mw.CSRF(http.HandlerFunc(admin.MediaTable))))
 	mux.Handle("POST /admin/media", mw.RequireAuth(mw.CSRF(mw.SensitiveLimit(http.HandlerFunc(admin.UploadMedia)))))
+	mux.Handle("GET /admin/media/files/{id}/variants/{name}", mw.RequireAuth(mw.CSRF(http.HandlerFunc(admin.MediaVariantFile))))
 	mux.Handle("GET /admin/media/files/{id}", mw.RequireAuth(mw.CSRF(http.HandlerFunc(admin.MediaFile))))
 
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
