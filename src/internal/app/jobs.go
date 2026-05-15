@@ -17,7 +17,12 @@ import (
 const autosaveCleanupJobType = "autosave_cleanup"
 const autosaveCleanupJobKey = "autosave-cleanup"
 
-type jobHandlerFunc func(ctx context.Context, job storesqlite.Job, now time.Time) (time.Time, error)
+type jobHandlerFunc func(ctx context.Context, job storesqlite.Job, now time.Time) (jobRunResult, error)
+
+type jobRunResult struct {
+	nextRunAt  time.Time
+	reschedule bool
+}
 
 type autosaveCleanupPayload struct{}
 
@@ -205,7 +210,7 @@ func (a *App) runJobsOnceAt(ctx context.Context, now time.Time) {
 	}
 
 	a.jobsMetrics.recordRun(job.Type)
-	nextRunAt, err := a.executeJob(ctx, job, now)
+	result, err := a.executeJob(ctx, job, now)
 	if err != nil {
 		a.jobsMetrics.recordFailure(job.Type)
 		a.logger.Error("run job", "job_type", job.Type, "job_key", job.Key, "error", err)
@@ -214,30 +219,36 @@ func (a *App) runJobsOnceAt(ctx context.Context, now time.Time) {
 	}
 
 	a.jobsMetrics.recordSuccess(job.Type)
-	if err := a.jobStore.CompleteJob(ctx, job, nextRunAt); err != nil {
+	if result.reschedule {
+		if err := a.jobStore.RescheduleJob(ctx, job, result.nextRunAt, now); err != nil {
+			a.logger.Error("reschedule job", "job_type", job.Type, "job_key", job.Key, "error", err)
+		}
+		return
+	}
+	if err := a.jobStore.CompleteJob(ctx, job, now); err != nil {
 		a.logger.Error("complete job", "job_type", job.Type, "job_key", job.Key, "error", err)
 	}
 }
 
-func (a *App) executeJob(ctx context.Context, job storesqlite.Job, now time.Time) (time.Time, error) {
+func (a *App) executeJob(ctx context.Context, job storesqlite.Job, now time.Time) (jobRunResult, error) {
 	handler := a.jobHandlers[job.Type]
 	if handler == nil {
-		return time.Time{}, fmt.Errorf("unsupported job type %q", job.Type)
+		return jobRunResult{}, fmt.Errorf("unsupported job type %q", job.Type)
 	}
 	return handler(ctx, job, now)
 }
 
-func (a *App) runAutosaveCleanupJob(ctx context.Context, job storesqlite.Job, now time.Time) (time.Time, error) {
+func (a *App) runAutosaveCleanupJob(ctx context.Context, job storesqlite.Job, now time.Time) (jobRunResult, error) {
 	if _, err := decodeJobPayload[autosaveCleanupPayload](job); err != nil {
-		return time.Time{}, err
+		return jobRunResult{}, err
 	}
 	cutoff := now.Add(-a.autosaveRetention)
 	deleted, err := a.jobStore.DeleteAutosaveSnapshotsOlderThan(ctx, cutoff)
 	if err != nil {
-		return time.Time{}, err
+		return jobRunResult{}, err
 	}
 	a.logger.Info("autosave cleanup completed", "deleted_snapshots", deleted, "retention", a.autosaveRetention.String())
-	return now.Add(a.autosaveCleanupEvery), nil
+	return jobRunResult{nextRunAt: now.Add(a.autosaveCleanupEvery), reschedule: true}, nil
 }
 
 func decodeJobPayload[T any](job storesqlite.Job) (T, error) {

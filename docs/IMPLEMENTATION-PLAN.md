@@ -413,8 +413,9 @@ job types.
 
 - The serve-mode runner uses a handler registry instead of hard-coding
   autosave cleanup execution.
-- Job handlers receive the claimed job and return the next successful run time,
-  keeping external work outside the database transaction used for claiming.
+- Job handlers receive the claimed job and return whether successful work should
+  be rescheduled, so recurring jobs can queue their next run while finite jobs
+  can complete terminally outside the database transaction used for claiming.
 - Payload decoding is typed per handler, with invalid payloads and unsupported
   job types flowing through the existing retry and terminal-failure path.
 - Job metrics now include total and per-job-type run, success, and failure

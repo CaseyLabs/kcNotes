@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"path/filepath"
 	"testing"
 	"time"
@@ -9,7 +10,7 @@ import (
 	"kcnotes/internal/domain"
 )
 
-func TestJobsStoreEnsureClaimAndComplete(t *testing.T) {
+func TestJobsStoreEnsureClaimAndReschedule(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	store := newJobsTestAuthStore(t)
@@ -50,12 +51,59 @@ func TestJobsStoreEnsureClaimAndComplete(t *testing.T) {
 	}
 
 	nextRun := time.Now().UTC().Add(time.Hour)
-	mustNoErr(t, store.CompleteJob(ctx, job, nextRun))
+	mustNoErr(t, store.RescheduleJob(ctx, job, nextRun, time.Now().UTC()))
 
 	pending, running, err := store.JobQueueCounts(ctx)
 	mustNoErr(t, err)
 	if pending != 1 || running != 0 {
 		t.Fatalf("unexpected queue counts pending=%d running=%d", pending, running)
+	}
+}
+
+func TestCompleteJobMarksSucceeded(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store := newJobsTestAuthStore(t)
+
+	_, err := store.EnsureJob(ctx, Job{
+		ID:          "job-complete",
+		Type:        "media_process",
+		Key:         "media-process-complete",
+		PayloadJSON: `{}`,
+		MaxAttempts: 3,
+		RunAt:       time.Now().UTC().Add(-time.Minute),
+	})
+	mustNoErr(t, err)
+
+	job, ok, err := store.ClaimDueJob(ctx, time.Now().UTC(), 5*time.Minute)
+	mustNoErr(t, err)
+	if !ok {
+		t.Fatalf("expected due job to be claimed")
+	}
+
+	finishedAt := time.Now().UTC()
+	mustNoErr(t, store.CompleteJob(ctx, job, finishedAt))
+
+	var status string
+	var lockedAt sql.NullString
+	err = store.db.QueryRowContext(ctx, `
+		SELECT status, locked_at
+		FROM jobs
+		WHERE id = ?
+	`, job.ID).Scan(&status, &lockedAt)
+	mustNoErr(t, err)
+
+	if status != JobStatusSucceeded {
+		t.Fatalf("expected succeeded status, got %q", status)
+	}
+	if lockedAt.Valid {
+		t.Fatalf("expected completed job lock to be cleared, got %q", lockedAt.String)
+	}
+
+	_, ok, err = store.ClaimDueJob(ctx, time.Now().UTC().Add(time.Hour), 5*time.Minute)
+	mustNoErr(t, err)
+	if ok {
+		t.Fatalf("did not expect completed one-shot job to be claimed again")
 	}
 }
 

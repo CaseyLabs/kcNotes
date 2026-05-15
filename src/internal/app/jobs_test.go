@@ -87,18 +87,18 @@ func TestRunJobsOnceExecutesRegisteredNonAutosaveHandler(t *testing.T) {
 	application.jobStore = sqlite.NewAuthStore(application.db)
 
 	var called int
-	application.registerJobHandler("test_job", func(ctx context.Context, job sqlite.Job, now time.Time) (time.Time, error) {
+	application.registerJobHandler("test_job", func(ctx context.Context, job sqlite.Job, now time.Time) (jobRunResult, error) {
 		payload, err := decodeJobPayload[struct {
 			Name string `json:"name"`
 		}](job)
 		if err != nil {
-			return time.Time{}, err
+			return jobRunResult{}, err
 		}
 		if payload.Name != "ok" {
-			return time.Time{}, fmt.Errorf("unexpected payload name %q", payload.Name)
+			return jobRunResult{}, fmt.Errorf("unexpected payload name %q", payload.Name)
 		}
 		called++
-		return now.Add(10 * time.Minute), nil
+		return jobRunResult{nextRunAt: now.Add(10 * time.Minute), reschedule: true}, nil
 	})
 
 	now := time.Date(2026, 5, 15, 13, 0, 0, 0, time.UTC)
@@ -132,6 +132,49 @@ func TestRunJobsOnceExecutesRegisteredNonAutosaveHandler(t *testing.T) {
 	}
 	if got := snapshot.ByType["test_job"].SuccessTotal; got != 1 {
 		t.Fatalf("expected test job success metric 1, got %d", got)
+	}
+}
+
+func TestRunJobsOnceCompletesOneShotHandler(t *testing.T) {
+	ctx := context.Background()
+	application := newTestApp(t)
+	application.jobStore = sqlite.NewAuthStore(application.db)
+
+	var called int
+	application.registerJobHandler("one_shot_job", func(ctx context.Context, job sqlite.Job, now time.Time) (jobRunResult, error) {
+		called++
+		return jobRunResult{}, nil
+	})
+
+	now := time.Date(2026, 5, 15, 13, 30, 0, 0, time.UTC)
+	ensureTestJob(t, application, sqlite.Job{
+		ID:          "job-app-one-shot",
+		Type:        "one_shot_job",
+		Key:         "app-one-shot-job",
+		PayloadJSON: `{}`,
+		MaxAttempts: 3,
+		RunAt:       now.Add(-time.Minute),
+	})
+
+	application.runJobsOnceAt(ctx, now)
+	application.runJobsOnceAt(ctx, now.Add(time.Minute))
+
+	if called != 1 {
+		t.Fatalf("expected one-shot handler to be called once, got %d", called)
+	}
+	status, _, lastError := readJobState(t, application, "job-app-one-shot")
+	if status != sqlite.JobStatusSucceeded {
+		t.Fatalf("expected one-shot job to complete successfully, got %q", status)
+	}
+	if lastError != "" {
+		t.Fatalf("expected one-shot job last error cleared, got %q", lastError)
+	}
+	snapshot := application.JobsMetricsSnapshot(ctx)
+	if snapshot.RunsTotal != 1 || snapshot.SuccessTotal != 1 || snapshot.FailureTotal != 0 {
+		t.Fatalf("unexpected total metrics: %+v", snapshot)
+	}
+	if got := snapshot.ByType["one_shot_job"].SuccessTotal; got != 1 {
+		t.Fatalf("expected one-shot job success metric 1, got %d", got)
 	}
 }
 
@@ -195,8 +238,8 @@ func TestRunJobsOnceRetriesHandlerErrorBeforeTerminalFailure(t *testing.T) {
 	ctx := context.Background()
 	application := newTestApp(t)
 	application.jobStore = sqlite.NewAuthStore(application.db)
-	application.registerJobHandler("flaky_job", func(ctx context.Context, job sqlite.Job, now time.Time) (time.Time, error) {
-		return time.Time{}, errors.New("temporary boom")
+	application.registerJobHandler("flaky_job", func(ctx context.Context, job sqlite.Job, now time.Time) (jobRunResult, error) {
+		return jobRunResult{}, errors.New("temporary boom")
 	})
 
 	now := time.Date(2026, 5, 15, 16, 0, 0, 0, time.UTC)

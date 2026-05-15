@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	JobStatusPending = "pending"
-	JobStatusRunning = "running"
-	JobStatusFailed  = "failed"
+	JobStatusPending   = "pending"
+	JobStatusRunning   = "running"
+	JobStatusSucceeded = "succeeded"
+	JobStatusFailed    = "failed"
 )
 
 type Job struct {
@@ -172,8 +173,34 @@ func (s *AuthStore) ClaimDueJob(ctx context.Context, now time.Time, staleAfter t
 	return claimed, true, nil
 }
 
-// CompleteJob marks a running job as successful and re-schedules it.
-func (s *AuthStore) CompleteJob(ctx context.Context, job Job, nextRunAt time.Time) error {
+// RescheduleJob marks a recurring job successful and queues its next run.
+func (s *AuthStore) RescheduleJob(ctx context.Context, job Job, nextRunAt time.Time, finishedAt time.Time) error {
+	if job.ID == "" {
+		return fmt.Errorf("reschedule job: job id is required")
+	}
+	if job.LockedAt == nil {
+		return fmt.Errorf("reschedule job: lock ownership is required")
+	}
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE jobs
+		SET status = ?, attempts = 0, run_at = ?, locked_at = NULL, last_error = NULL, last_finished_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		WHERE id = ? AND status = ? AND locked_at = ?
+	`, JobStatusPending, nextRunAt.UTC().Format(time.RFC3339Nano), finishedAt.UTC().Format(time.RFC3339Nano), job.ID, JobStatusRunning, job.LockedAt.UTC().Format(time.RFC3339Nano))
+	if err != nil {
+		return fmt.Errorf("reschedule job: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("reschedule job rows: %w", err)
+	}
+	if rows == 0 {
+		return ErrConflict
+	}
+	return nil
+}
+
+// CompleteJob marks a one-shot job as successfully finished.
+func (s *AuthStore) CompleteJob(ctx context.Context, job Job, finishedAt time.Time) error {
 	if job.ID == "" {
 		return fmt.Errorf("complete job: job id is required")
 	}
@@ -182,9 +209,9 @@ func (s *AuthStore) CompleteJob(ctx context.Context, job Job, nextRunAt time.Tim
 	}
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE jobs
-		SET status = ?, attempts = 0, run_at = ?, locked_at = NULL, last_error = NULL, last_finished_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		SET status = ?, locked_at = NULL, last_error = NULL, last_finished_at = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		WHERE id = ? AND status = ? AND locked_at = ?
-	`, JobStatusPending, nextRunAt.UTC().Format(time.RFC3339Nano), time.Now().UTC().Format(time.RFC3339Nano), job.ID, JobStatusRunning, job.LockedAt.UTC().Format(time.RFC3339Nano))
+	`, JobStatusSucceeded, finishedAt.UTC().Format(time.RFC3339Nano), job.ID, JobStatusRunning, job.LockedAt.UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return fmt.Errorf("complete job: %w", err)
 	}
