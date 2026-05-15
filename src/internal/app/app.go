@@ -43,6 +43,7 @@ type App struct {
 	autosaveRetention    time.Duration
 	autosaveCleanupEvery time.Duration
 	jobsMetrics          *jobsMetrics
+	jobHandlers          map[string]jobHandlerFunc
 }
 
 // New explains one unit of behavior in this package.

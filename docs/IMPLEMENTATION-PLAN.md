@@ -406,23 +406,26 @@ allowlisting.
 - Admin exposure remains controlled by passkey-only auth, sessions, CSRF, RBAC,
   rate limits, and existing trusted-proxy-aware client IP handling.
 
-### N1: Background Jobs Expansion
+### Completed Optional Phase: Background Jobs Expansion
 
-N1 is the next implementation phase. It should broaden the existing jobs runner
-beyond autosave cleanup so later phases can add deferred workloads without
-creating one-off execution paths.
+N1 is implemented as the durable app-layer job handler foundation for multiple
+job types.
 
-- Define the durable job payload and handler contract for multiple job types.
-- Add focused tests for claiming, retrying, terminal failure, idempotent
-  completion, unsupported job types, and metrics for non-autosave workloads.
-- Keep external IO outside database transactions and preserve the existing
-  transient retry semantics.
-- Update README or workflow docs only if operator-visible job configuration or
-  behavior changes.
+- The serve-mode runner uses a handler registry instead of hard-coding
+  autosave cleanup execution.
+- Job handlers receive the claimed job and return the next successful run time,
+  keeping external work outside the database transaction used for claiming.
+- Payload decoding is typed per handler, with invalid payloads and unsupported
+  job types flowing through the existing retry and terminal-failure path.
+- Job metrics now include total and per-job-type run, success, and failure
+  counters while preserving queue-depth and database retry logging.
+- Autosave cleanup keeps its existing job key, retention configuration, cleanup
+  interval, and recurring behavior.
 
 ### N2: Background Media Processing
 
-N2 should move the remaining media-processing backlog onto the N1 job-backed
+N2 is the next implementation phase. It should move the remaining
+media-processing backlog onto the N1 job-backed
 path.
 
 - Keep the existing synchronous media upload safety checks: size limit, MIME
@@ -509,4 +512,4 @@ Required scope is complete when:
   completed state.
 
 Future development should proceed through the next implementation phases above,
-starting with N1 unless this tracker is updated again.
+starting with N2 unless this tracker is updated again.

@@ -113,9 +113,10 @@ private content.
 
 The background metrics log summarizes in-process counters for HTTP status
 classes and duration buckets, passkey login successes/failures, lockout and
-rate-limit hits, job queue depth, job run outcomes, and database retry counts.
-These logs are intended for collection by the deployment's normal log
-aggregation pipeline; kcNotes does not expose a public metrics endpoint.
+rate-limit hits, job queue depth, total and per-type job run outcomes, and
+database retry counts. These logs are intended for collection by the
+deployment's normal log aggregation pipeline; kcNotes does not expose a public
+metrics endpoint.
 
 ## CLI Modes
 
