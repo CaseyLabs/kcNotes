@@ -65,6 +65,8 @@ func (s *AuthStore) EnsureJob(ctx context.Context, job Job) (bool, error) {
 			INSERT INTO jobs(id, job_type, job_key, payload_json, status, attempts, max_attempts, run_at, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, 0, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			ON CONFLICT(job_key) DO UPDATE SET
+				job_type = excluded.job_type,
+				payload_json = excluded.payload_json,
 				status = excluded.status,
 				attempts = 0,
 				max_attempts = excluded.max_attempts,

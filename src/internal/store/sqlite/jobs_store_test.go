@@ -158,9 +158,9 @@ func TestEnsureJobRearmsFailedJob(t *testing.T) {
 
 	_, err := store.EnsureJob(ctx, Job{
 		ID:          "job-rearm-initial",
-		Type:        "autosave_cleanup",
+		Type:        "legacy_autosave_cleanup",
 		Key:         "autosave-cleanup-rearm",
-		PayloadJSON: `{}`,
+		PayloadJSON: `{"legacy":true}`,
 		MaxAttempts: 1,
 		RunAt:       time.Now().UTC().Add(-time.Minute),
 	})
@@ -187,14 +187,21 @@ func TestEnsureJobRearmsFailedJob(t *testing.T) {
 	}
 
 	var status, lastErr string
+	var jobType, payloadJSON string
 	var attempts, maxAttempts int
 	err = store.db.QueryRowContext(ctx, `
-		SELECT status, attempts, max_attempts, COALESCE(last_error, '')
+		SELECT job_type, payload_json, status, attempts, max_attempts, COALESCE(last_error, '')
 		FROM jobs
 		WHERE job_key = ?
-	`, "autosave-cleanup-rearm").Scan(&status, &attempts, &maxAttempts, &lastErr)
+	`, "autosave-cleanup-rearm").Scan(&jobType, &payloadJSON, &status, &attempts, &maxAttempts, &lastErr)
 	mustNoErr(t, err)
 
+	if jobType != "autosave_cleanup" {
+		t.Fatalf("expected revived job type to be refreshed, got %q", jobType)
+	}
+	if payloadJSON != "{}" {
+		t.Fatalf("expected revived job payload to be refreshed, got %q", payloadJSON)
+	}
 	if status != JobStatusPending {
 		t.Fatalf("expected revived job status pending, got %q", status)
 	}
