@@ -219,15 +219,23 @@ func (a *App) runJobsOnceAt(ctx context.Context, now time.Time) {
 	}
 
 	a.jobsMetrics.recordSuccess(job.Type)
+	finishedAt := a.nowUTC()
 	if result.reschedule {
-		if err := a.jobStore.RescheduleJob(ctx, job, result.nextRunAt, now); err != nil {
+		if err := a.jobStore.RescheduleJob(ctx, job, result.nextRunAt, finishedAt); err != nil {
 			a.logger.Error("reschedule job", "job_type", job.Type, "job_key", job.Key, "error", err)
 		}
 		return
 	}
-	if err := a.jobStore.CompleteJob(ctx, job, now); err != nil {
+	if err := a.jobStore.CompleteJob(ctx, job, finishedAt); err != nil {
 		a.logger.Error("complete job", "job_type", job.Type, "job_key", job.Key, "error", err)
 	}
+}
+
+func (a *App) nowUTC() time.Time {
+	if a.nowFunc == nil {
+		return time.Now().UTC()
+	}
+	return a.nowFunc().UTC()
 }
 
 func (a *App) executeJob(ctx context.Context, job storesqlite.Job, now time.Time) (jobRunResult, error) {

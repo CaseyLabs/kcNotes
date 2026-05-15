@@ -44,6 +44,7 @@ type App struct {
 	autosaveCleanupEvery time.Duration
 	jobsMetrics          *jobsMetrics
 	jobHandlers          map[string]jobHandlerFunc
+	nowFunc              func() time.Time
 }
 
 // New explains one unit of behavior in this package.
@@ -87,6 +88,7 @@ func New(cfg Config, logger *slog.Logger) (*App, error) {
 		jobsPollInterval:     cfg.JobsPollInterval,
 		autosaveRetention:    cfg.AutosaveRetention,
 		autosaveCleanupEvery: cfg.AutosaveCleanupEvery,
+		nowFunc:              time.Now,
 	}, nil
 }
 

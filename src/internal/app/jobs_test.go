@@ -85,6 +85,8 @@ func TestRunJobsOnceExecutesRegisteredNonAutosaveHandler(t *testing.T) {
 	ctx := context.Background()
 	application := newTestApp(t)
 	application.jobStore = sqlite.NewAuthStore(application.db)
+	finishedAt := time.Date(2026, 5, 15, 13, 7, 0, 0, time.UTC)
+	application.nowFunc = func() time.Time { return finishedAt }
 
 	var called int
 	application.registerJobHandler("test_job", func(ctx context.Context, job sqlite.Job, now time.Time) (jobRunResult, error) {
@@ -126,6 +128,9 @@ func TestRunJobsOnceExecutesRegisteredNonAutosaveHandler(t *testing.T) {
 	if lastError != "" {
 		t.Fatalf("expected test job last error cleared, got %q", lastError)
 	}
+	if got := readJobLastFinishedAt(t, application, "job-app-test"); !got.Equal(finishedAt) {
+		t.Fatalf("expected test job finish time %s, got %s", finishedAt, got)
+	}
 	snapshot := application.JobsMetricsSnapshot(ctx)
 	if snapshot.RunsTotal != 1 || snapshot.SuccessTotal != 1 || snapshot.FailureTotal != 0 {
 		t.Fatalf("unexpected total metrics: %+v", snapshot)
@@ -139,6 +144,8 @@ func TestRunJobsOnceCompletesOneShotHandler(t *testing.T) {
 	ctx := context.Background()
 	application := newTestApp(t)
 	application.jobStore = sqlite.NewAuthStore(application.db)
+	finishedAt := time.Date(2026, 5, 15, 13, 37, 0, 0, time.UTC)
+	application.nowFunc = func() time.Time { return finishedAt }
 
 	var called int
 	application.registerJobHandler("one_shot_job", func(ctx context.Context, job sqlite.Job, now time.Time) (jobRunResult, error) {
@@ -168,6 +175,9 @@ func TestRunJobsOnceCompletesOneShotHandler(t *testing.T) {
 	}
 	if lastError != "" {
 		t.Fatalf("expected one-shot job last error cleared, got %q", lastError)
+	}
+	if got := readJobLastFinishedAt(t, application, "job-app-one-shot"); !got.Equal(finishedAt) {
+		t.Fatalf("expected one-shot job finish time %s, got %s", finishedAt, got)
 	}
 	snapshot := application.JobsMetricsSnapshot(ctx)
 	if snapshot.RunsTotal != 1 || snapshot.SuccessTotal != 1 || snapshot.FailureTotal != 0 {
@@ -310,4 +320,22 @@ func readJobState(t *testing.T, application *App, id string) (status string, run
 		t.Fatalf("parse job run_at: %v", err)
 	}
 	return status, runAt, lastError
+}
+
+func readJobLastFinishedAt(t *testing.T, application *App, id string) time.Time {
+	t.Helper()
+	var raw string
+	err := application.db.QueryRowContext(context.Background(), `
+		SELECT last_finished_at
+		FROM jobs
+		WHERE id = ?
+	`, id).Scan(&raw)
+	if err != nil {
+		t.Fatalf("read job last_finished_at: %v", err)
+	}
+	finishedAt, err := time.Parse(time.RFC3339Nano, raw)
+	if err != nil {
+		t.Fatalf("parse job last_finished_at: %v", err)
+	}
+	return finishedAt
 }
