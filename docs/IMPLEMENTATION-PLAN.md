@@ -313,15 +313,17 @@ password, TOTP, recovery-code, email-delivery, or self-service recovery path.
 - The copy action uses the existing self-hosted JavaScript bundle; no new
   dependency was added.
 
-## Optional Backlog
+## Next Implementation Phases
 
-These items are useful, but they are not required for the current documented
-completion scope.
+The required completion scope is done. Future implementation work should be
+selected from these next phases, starting with N1 unless the tracker is updated
+again. Previously selected optional work is kept here as completed history so
+agents do not reopen finished phases as blockers.
 
-### O1: Passkey Attestation Policy
+### Completed Optional Phase: Passkey Attestation Policy
 
-Optional passkey attestation policy is implemented and remains disabled by
-default for broad platform-passkey compatibility.
+Passkey attestation policy is implemented and remains disabled by default for
+broad platform-passkey compatibility.
 
 - `WEBAUTHN_ATTESTATION_CONVEYANCE` accepts `none`, `indirect`, `direct`, and
   `enterprise`; invalid values fail WebAuthn setup instead of silently
@@ -332,7 +334,7 @@ default for broad platform-passkey compatibility.
 - Strict attestation conveyance and AAGUID allowlists are deployment-controlled
   because they can block common platform and password-manager passkeys.
 
-### O2: Media Processing Pipeline
+### Completed Optional Phase: Media Processing Pipeline
 
 The synchronous first slice is implemented.
 
@@ -341,11 +343,13 @@ The synchronous first slice is implemented.
 - Thumbnail and large responsive variants are generated synchronously for
   larger JPEG/PNG uploads.
 - Variant metadata is stored in the media model and published with originals.
-- Optional background media processing remains backlog.
+- Background media processing is intentionally deferred to N2 after the jobs
+  runner is expanded in N1.
 
-### O3: Jobs Table and Runner
+### Completed Optional Phase: Jobs Table and Runner Foundation
 
-O3 is partially implemented for the first production workload.
+The jobs table and runner foundation is implemented for the first production
+workload.
 
 - `jobs` table exists with unique `job_key`, due-job indexes, and lock-state
   indexes.
@@ -355,13 +359,13 @@ O3 is partially implemented for the first production workload.
   `AUTOSAVE_RETENTION_DURATION` and `AUTOSAVE_CLEANUP_INTERVAL`.
 - Minimal job metrics (run/success/failure counts plus pending/running queue
   counts) are emitted through structured logs for operational visibility.
-- Additional O3 uses (media processing, publish workflows, and broader deferred
-  work) remain backlog.
+- Additional jobs uses are now tracked as N1, N2, and N3 below.
 
-### O4: Observability Expansion
+### Completed Optional Phase: Observability Expansion
 
-O4 is implemented as in-process structured-log observability without adding a
-public metrics endpoint or external telemetry dependency.
+Observability expansion is implemented as in-process structured-log
+observability without adding a public metrics endpoint or external telemetry
+dependency.
 
 - Each HTTP request logs method, matched route pattern, status, duration, and
   request ID.
@@ -375,10 +379,10 @@ public metrics endpoint or external telemetry dependency.
 - README documents the log-backed observability model and aggregation
   expectation.
 
-### O5: Media De-Duplication
+### Completed Optional Phase: Media De-Duplication
 
-O5 is implemented with one physical media asset per normalized image SHA-256 and
-one media-library row per uploader.
+Media de-duplication is implemented with one physical media asset per normalized
+image SHA-256 and one media-library row per uploader.
 
 - `media_assets` stores canonical physical file metadata and enforces unique
   normalized SHA-256 values.
@@ -393,13 +397,53 @@ one media-library row per uploader.
 - Static publishing and authenticated media previews continue to use the same
   `/media/{stored_name}` and `/admin/media/files/{id}` contracts.
 
-### O6: Admin Exposure Extras
+### Completed Optional Phase: Admin Exposure Extras
 
-O6 is implemented as crawler guidance without adding IP allowlisting.
+Admin exposure extras are implemented as crawler guidance without adding IP
+allowlisting.
 
 - `GET /robots.txt` returns explicit `Disallow` rules for admin paths.
 - Admin exposure remains controlled by passkey-only auth, sessions, CSRF, RBAC,
   rate limits, and existing trusted-proxy-aware client IP handling.
+
+### N1: Background Jobs Expansion
+
+N1 is the next implementation phase. It should broaden the existing jobs runner
+beyond autosave cleanup so later phases can add deferred workloads without
+creating one-off execution paths.
+
+- Define the durable job payload and handler contract for multiple job types.
+- Add focused tests for claiming, retrying, terminal failure, idempotent
+  completion, unsupported job types, and metrics for non-autosave workloads.
+- Keep external IO outside database transactions and preserve the existing
+  transient retry semantics.
+- Update README or workflow docs only if operator-visible job configuration or
+  behavior changes.
+
+### N2: Background Media Processing
+
+N2 should move the remaining media-processing backlog onto the N1 job-backed
+path.
+
+- Keep the existing synchronous media upload safety checks: size limit, MIME
+  allowlist, magic-byte detection, image decode verification, randomized stored
+  names, quota enforcement, and canonical SHA-256 de-duplication.
+- Defer expensive derivative work through jobs where practical while preserving
+  the current admin preview and static publish URL contracts.
+- Cover upload, duplicate, retry, failed-processing, quota, preview, and publish
+  behavior with focused tests.
+
+### N3: Deferred Publish Workflows
+
+N3 should add publish-related deferred work after the jobs runner supports
+multiple production workloads.
+
+- Use the job runner for publish tasks that benefit from deferred or retryable
+  execution.
+- Preserve current publish outputs, including generated routes, copied assets,
+  copied media, RSS, sitemap, manifest generation, and orphan cleanup.
+- Keep `make publish` and `make preview` behavior clear and reproducible; update
+  documentation if the operator workflow changes.
 
 ## Verification Plan
 
@@ -464,4 +508,5 @@ Required scope is complete when:
 - README, `AGENTS.md`, and this implementation plan accurately reflect the
   completed state.
 
-Optional scope is complete only when separately selected and implemented.
+Future development should proceed through the next implementation phases above,
+starting with N1 unless this tracker is updated again.
