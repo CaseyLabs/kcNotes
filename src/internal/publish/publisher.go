@@ -16,6 +16,7 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -25,6 +26,8 @@ import (
 )
 
 const manifestName = ".publish-manifest.json"
+
+var mediaReferencePattern = regexp.MustCompile(`(?:^|[\s('"])/media/([A-Za-z0-9._-]+)`)
 
 type Store interface {
 	ListPublicPosts(ctx context.Context, includeDrafts bool, limit int) ([]domain.Post, error)
@@ -171,7 +174,7 @@ func (p *Publisher) renderAll(ctx context.Context, outDir string) ([]string, err
 	if assets, err := listFiles(filepath.Join(outDir, "assets")); err == nil {
 		renderedFiles = append(renderedFiles, assets...)
 	}
-	mediaFiles, err := p.copyUploadedMedia(ctx, outDir)
+	mediaFiles, err := p.copyUploadedMedia(ctx, outDir, referencedMediaNames(posts, pages))
 	if err != nil {
 		return nil, err
 	}
@@ -252,12 +255,12 @@ func (p *Publisher) renderAll(ctx context.Context, outDir string) ([]string, err
 
 // copyUploadedMedia explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
-func (p *Publisher) copyUploadedMedia(ctx context.Context, outDir string) ([]string, error) {
+func (p *Publisher) copyUploadedMedia(ctx context.Context, outDir string, referenced map[string]struct{}) ([]string, error) {
 	items, err := p.store.ListPublishableMedia(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load media for publish: %w", err)
 	}
-	if len(items) == 0 {
+	if len(items) == 0 || len(referenced) == 0 {
 		return nil, nil
 	}
 
@@ -267,22 +270,31 @@ func (p *Publisher) copyUploadedMedia(ctx context.Context, outDir string) ([]str
 	}
 
 	files := make([]string, 0, len(items))
+	seen := map[string]struct{}{}
 	for _, item := range items {
 		if !isPublishableMediaType(item.MIME) {
 			continue
 		}
-		copied, err := p.copyUploadedMediaFile(mediaDir, item.StoredName)
-		if err != nil {
-			return nil, err
-		}
-		if copied != "" {
-			files = append(files, copied)
+		copyFamily := hasMediaReference(referenced, item)
+		if copyFamily {
+			copied, err := p.copyUploadedMediaFile(mediaDir, item.StoredName, seen)
+			if err != nil {
+				return nil, err
+			}
+			if copied != "" {
+				files = append(files, copied)
+			}
 		}
 		for _, variant := range item.Variants {
 			if !isPublishableMediaType(variant.MIME) {
 				continue
 			}
-			copied, err := p.copyUploadedMediaFile(mediaDir, variant.StoredName)
+			if !copyFamily {
+				if _, ok := referenced[variant.StoredName]; !ok {
+					continue
+				}
+			}
+			copied, err := p.copyUploadedMediaFile(mediaDir, variant.StoredName, seen)
 			if err != nil {
 				return nil, err
 			}
@@ -294,8 +306,11 @@ func (p *Publisher) copyUploadedMedia(ctx context.Context, outDir string) ([]str
 	return files, nil
 }
 
-func (p *Publisher) copyUploadedMediaFile(mediaDir, storedName string) (string, error) {
+func (p *Publisher) copyUploadedMediaFile(mediaDir, storedName string, seen map[string]struct{}) (string, error) {
 	if filepath.Base(storedName) != storedName {
+		return "", nil
+	}
+	if _, ok := seen[storedName]; ok {
 		return "", nil
 	}
 	src := filepath.Join(p.cfg.UploadDir, storedName)
@@ -303,7 +318,34 @@ func (p *Publisher) copyUploadedMediaFile(mediaDir, storedName string) (string, 
 	if err := copyPath(src, dst); err != nil {
 		return "", fmt.Errorf("copy media file %s: %w", storedName, err)
 	}
+	seen[storedName] = struct{}{}
 	return filepath.ToSlash(filepath.Join("media", storedName)), nil
+}
+
+func referencedMediaNames(groups ...[]domain.Post) map[string]struct{} {
+	refs := map[string]struct{}{}
+	for _, posts := range groups {
+		for _, post := range posts {
+			for _, match := range mediaReferencePattern.FindAllStringSubmatch(post.BodyMD, -1) {
+				if len(match) == 2 && filepath.Base(match[1]) == match[1] {
+					refs[match[1]] = struct{}{}
+				}
+			}
+		}
+	}
+	return refs
+}
+
+func hasMediaReference(referenced map[string]struct{}, item domain.Media) bool {
+	if _, ok := referenced[item.StoredName]; ok {
+		return true
+	}
+	for _, variant := range item.Variants {
+		if _, ok := referenced[variant.StoredName]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 // renderTemplateToPath explains one unit of behavior in this package.

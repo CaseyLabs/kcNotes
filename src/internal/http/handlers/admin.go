@@ -87,8 +87,8 @@ type adminStore interface {
 	GetMediaAssetBySHA256(ctx context.Context, sha256 string) (domain.MediaAsset, error)
 	GetMediaByAssetAndUser(ctx context.Context, assetID, userID string) (domain.Media, error)
 	MediaUsage(ctx context.Context, userID string) (userBytes, totalBytes int64, err error)
-	ListMedia(ctx context.Context, limit int) ([]domain.Media, error)
-	GetMediaByID(ctx context.Context, id string) (domain.Media, error)
+	ListMediaForUser(ctx context.Context, limit int, user domain.User) ([]domain.Media, error)
+	GetMediaByIDForUser(ctx context.Context, id string, user domain.User) (domain.Media, error)
 }
 
 type AdminConfig struct {
@@ -175,7 +175,7 @@ func (h *Admin) Dashboard(w http.ResponseWriter, r *http.Request) {
 		h.renderError(w, r, http.StatusInternalServerError, "failed to load dashboard")
 		return
 	}
-	media, err := h.store.ListMedia(r.Context(), 4)
+	media, err := h.store.ListMediaForUser(r.Context(), 4, user)
 	if err != nil {
 		h.renderError(w, r, http.StatusInternalServerError, "failed to load dashboard")
 		return

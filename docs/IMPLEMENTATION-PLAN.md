@@ -169,9 +169,11 @@ the UI refresh.
 - Randomized stored filenames.
 - Original filename stored only as metadata.
 - Per-user and global media quota enforcement.
+- Non-admin media browsing and preview are scoped to the uploader's own media
+  library rows; admins retain global media visibility.
 - Auth-protected media preview endpoint.
-- Static publishing copies allowlisted media originals and recorded variants
-  into `dist/media`.
+- Static publishing copies only allowlisted media originals and recorded
+  variants referenced from published post/page bodies into `dist/media`.
 
 ### Settings
 
@@ -394,8 +396,10 @@ image SHA-256 and one media-library row per uploader.
   original and variant files.
 - User quota counts the uploader's logical library row, while global quota
   counts shared physical assets only once.
-- Static publishing and authenticated media previews continue to use the same
-  `/media/{stored_name}` and `/admin/media/files/{id}` contracts.
+- Non-admin authenticated media previews are limited to the requesting user's
+  own library rows; admins can browse and preview all rows.
+- Static publishing keeps the `/media/{stored_name}` contract but only copies
+  referenced media families from published post/page bodies.
 
 ### Completed Optional Phase: Admin Exposure Extras
 
@@ -445,7 +449,8 @@ multiple production workloads.
 - Use the job runner for publish tasks that benefit from deferred or retryable
   execution.
 - Preserve current publish outputs, including generated routes, copied assets,
-  copied media, RSS, sitemap, manifest generation, and orphan cleanup.
+  copied referenced media, RSS, sitemap, manifest generation, and orphan
+  cleanup.
 - Keep `make publish` and `make preview` behavior clear and reproducible; update
   documentation if the operator workflow changes.
 

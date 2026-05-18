@@ -13,8 +13,8 @@ container-driven workflows.
 - Self-hosted static assets and Tailwind CSS.
 - SQLite/libSQL storage with local, remote Turso, and optional replica modes.
 - Passkey-only admin auth, CSRF protection, RBAC, rate limiting, and account lockout.
-- Posts/pages with edit-form autosave recovery, media uploads with generated
-  image variants, settings, audit log, search, and static publishing.
+- Posts/pages with edit-form autosave recovery, owner-scoped media uploads with
+  generated image variants, settings, audit log, search, and static publishing.
 - Root-owned Docker, Make, GitHub Actions, security scan, dependency update,
   and release integrity workflows.
 
@@ -51,8 +51,8 @@ Core app commands:
 - `make lint`: runs format and lint checks.
 - `make migrate`: applies database migrations.
 - `make run`: applies pending migrations, then starts the CMS.
-- `make publish`: writes the static site to `dist/site` unless
-  `PUBLISH_OUT_DIR` is set.
+- `make publish`: writes the static site and referenced media to `dist/site`
+  unless `PUBLISH_OUT_DIR` is set.
 - `make preview`: serves the published static site.
 - `make smoke`: runs HTTP smoke probes.
 - `make stop`: stops managed kcNotes containers.

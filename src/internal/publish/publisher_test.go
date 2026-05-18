@@ -100,6 +100,9 @@ func TestPublisherBuildsStaticSiteAndReplacesOldOutput(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(uploadDir, "img-1-thumb.png"), []byte{0x89, 0x50, 0x4e, 0x47}, 0o644); err != nil {
 		t.Fatalf("write media variant: %v", err)
 	}
+	if err := os.WriteFile(filepath.Join(uploadDir, "secret-draft.png"), []byte{0x89, 0x50, 0x4e, 0x47}, 0o644); err != nil {
+		t.Fatalf("write unreferenced upload: %v", err)
+	}
 
 	outDir := filepath.Join(root, "dist")
 	if err := os.MkdirAll(filepath.Join(outDir, "old"), 0o755); err != nil {
@@ -119,7 +122,7 @@ func TestPublisherBuildsStaticSiteAndReplacesOldOutput(t *testing.T) {
 			Type:        domain.PostTypePost,
 			Title:       "Hello",
 			Slug:        "hello",
-			BodyMD:      "world",
+			BodyMD:      "world\n\n![Hero](/media/img-1.png)",
 			Status:      domain.PostStatusPublished,
 			UpdatedAt:   now,
 			PublishedAt: &now,
@@ -142,6 +145,10 @@ func TestPublisherBuildsStaticSiteAndReplacesOldOutput(t *testing.T) {
 				StoredName: "img-1-thumb.png",
 				MIME:       "image/png",
 			}},
+		}, {
+			ID:         "m-secret",
+			StoredName: "secret-draft.png",
+			MIME:       "image/png",
 		}},
 	}
 
@@ -179,6 +186,9 @@ func TestPublisherBuildsStaticSiteAndReplacesOldOutput(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(outDir, "old", "orphan.html")); !os.IsNotExist(err) {
 		t.Fatalf("expected orphan file removed, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "media", "secret-draft.png")); !os.IsNotExist(err) {
+		t.Fatalf("expected unreferenced media not to be published, err=%v", err)
 	}
 
 	sitemap, err := os.ReadFile(filepath.Join(outDir, "sitemap.xml"))
