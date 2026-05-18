@@ -59,7 +59,7 @@ func (h *Admin) MediaPage(w http.ResponseWriter, r *http.Request) {
 		h.renderError(w, r, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	media, err := h.store.ListMedia(r.Context(), defaultMediaLimit)
+	media, err := h.store.ListMediaForUser(r.Context(), defaultMediaLimit, user)
 	if err != nil {
 		h.renderError(w, r, http.StatusInternalServerError, "failed to load media")
 		return
@@ -78,7 +78,7 @@ func (h *Admin) MediaTable(w http.ResponseWriter, r *http.Request) {
 		h.renderError(w, r, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	media, err := h.store.ListMedia(r.Context(), defaultMediaLimit)
+	media, err := h.store.ListMediaForUser(r.Context(), defaultMediaLimit, user)
 	if err != nil {
 		h.renderError(w, r, http.StatusInternalServerError, "failed to load media")
 		return
@@ -253,13 +253,18 @@ func (h *Admin) attachExistingMediaAsset(w http.ResponseWriter, r *http.Request,
 // MediaFile explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func (h *Admin) MediaFile(w http.ResponseWriter, r *http.Request) {
+	user, ok := middleware.CurrentUser(r)
+	if !ok {
+		h.renderError(w, r, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	id := strings.TrimSpace(r.PathValue("id"))
 	if id == "" {
 		http.NotFound(w, r)
 		return
 	}
 
-	media, err := h.store.GetMediaByID(r.Context(), id)
+	media, err := h.store.GetMediaByIDForUser(r.Context(), id, user)
 	if err != nil {
 		if errors.Is(err, storesqlite.ErrNotFound) {
 			http.NotFound(w, r)
@@ -283,6 +288,11 @@ func (h *Admin) MediaFile(w http.ResponseWriter, r *http.Request) {
 // MediaVariantFile serves a generated media variant, such as the thumbnail used
 // by the admin media grid, without streaming the original upload into each card.
 func (h *Admin) MediaVariantFile(w http.ResponseWriter, r *http.Request) {
+	user, ok := middleware.CurrentUser(r)
+	if !ok {
+		h.renderError(w, r, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	id := strings.TrimSpace(r.PathValue("id"))
 	name := strings.TrimSpace(r.PathValue("name"))
 	if id == "" || name == "" {
@@ -290,7 +300,7 @@ func (h *Admin) MediaVariantFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	media, err := h.store.GetMediaByID(r.Context(), id)
+	media, err := h.store.GetMediaByIDForUser(r.Context(), id, user)
 	if err != nil {
 		if errors.Is(err, storesqlite.ErrNotFound) {
 			http.NotFound(w, r)
@@ -339,7 +349,7 @@ func (h *Admin) serveUploadedMedia(w http.ResponseWriter, r *http.Request, store
 func (h *Admin) renderMediaUploadError(w http.ResponseWriter, r *http.Request, user domain.User, message string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusUnprocessableEntity)
-	media, err := h.store.ListMedia(r.Context(), defaultMediaLimit)
+	media, err := h.store.ListMediaForUser(r.Context(), defaultMediaLimit, user)
 	if err != nil {
 		media = nil
 	}
@@ -356,7 +366,7 @@ func (h *Admin) renderMediaUploadError(w http.ResponseWriter, r *http.Request, u
 // In Go, functions often return early on errors to keep the success path simple.
 func (h *Admin) renderMediaTableAfterAction(w http.ResponseWriter, r *http.Request, user domain.User, message string) {
 	if middleware.IsHTMX(r) {
-		media, err := h.store.ListMedia(r.Context(), defaultMediaLimit)
+		media, err := h.store.ListMediaForUser(r.Context(), defaultMediaLimit, user)
 		if err != nil {
 			h.renderError(w, r, http.StatusInternalServerError, "failed to load media")
 			return

@@ -178,6 +178,73 @@ func TestMediaVariantFileServesGeneratedThumbnail(t *testing.T) {
 	}
 }
 
+func TestMediaHandlersRestrictNonAdminToOwnedMedia(t *testing.T) {
+	admin, store, uploadDir := newMediaHandlerTestAdmin(t, 200<<20, 2<<30)
+	ctx := context.Background()
+	if err := store.CreateUser(ctx, domain.User{
+		ID:    "author-1",
+		Email: "author@example.com",
+		Role:  domain.RoleAuthor,
+	}); err != nil {
+		t.Fatalf("create author: %v", err)
+	}
+	if err := store.CreateSession(ctx, "session-author", "author-1", "csrf-token", time.Now().UTC().Add(time.Hour)); err != nil {
+		t.Fatalf("create author session: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(uploadDir, "admin-owned.png"), testPNG(t, 1, 1), 0o644); err != nil {
+		t.Fatalf("write admin media: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(uploadDir, "author-owned.png"), testPNG(t, 1, 1), 0o644); err != nil {
+		t.Fatalf("write author media: %v", err)
+	}
+	if err := store.CreateMedia(ctx, domain.Media{
+		ID:           "media-admin",
+		StoredName:   "admin-owned.png",
+		OriginalName: "admin-owned.png",
+		MIME:         "image/png",
+		Size:         10,
+		SHA256:       "admin-owned",
+		CreatedBy:    "admin-1",
+	}); err != nil {
+		t.Fatalf("create admin media: %v", err)
+	}
+	if err := store.CreateMedia(ctx, domain.Media{
+		ID:           "media-author",
+		StoredName:   "author-owned.png",
+		OriginalName: "author-owned.png",
+		MIME:         "image/png",
+		Size:         10,
+		SHA256:       "author-owned",
+		CreatedBy:    "author-1",
+	}); err != nil {
+		t.Fatalf("create author media: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/media", nil)
+	req.AddCookie(&http.Cookie{Name: "cms_session", Value: "session-author", Path: "/admin"})
+	res := httptest.NewRecorder()
+	usersHandlerStack(store, http.HandlerFunc(admin.MediaPage)).ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected media page status 200, got %d: %s", res.Code, res.Body.String())
+	}
+	body := res.Body.String()
+	if !strings.Contains(body, "author-owned.png") {
+		t.Fatalf("expected author-owned media in response, got:\n%s", body)
+	}
+	if strings.Contains(body, "admin-owned.png") {
+		t.Fatalf("expected admin-owned media to be hidden from author, got:\n%s", body)
+	}
+
+	fileReq := httptest.NewRequest(http.MethodGet, "/admin/media/files/media-admin", nil)
+	fileReq.SetPathValue("id", "media-admin")
+	fileReq.AddCookie(&http.Cookie{Name: "cms_session", Value: "session-author", Path: "/admin"})
+	fileRes := httptest.NewRecorder()
+	usersHandlerStack(store, http.HandlerFunc(admin.MediaFile)).ServeHTTP(fileRes, fileReq)
+	if fileRes.Code != http.StatusNotFound {
+		t.Fatalf("expected non-owned media fetch to return 404, got %d", fileRes.Code)
+	}
+}
+
 func TestUploadMediaQuotaErrorDoesNotWriteFilesOrMetadata(t *testing.T) {
 	admin, store, uploadDir := newMediaHandlerTestAdmin(t, 1, 2<<30)
 	req := newMediaUploadRequest(t, "hero.png", testPNG(t, 640, 320))

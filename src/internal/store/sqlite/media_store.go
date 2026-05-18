@@ -123,9 +123,30 @@ func (s *AuthStore) AttachMediaToAsset(ctx context.Context, media domain.Media) 
 // ListMedia explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func (s *AuthStore) ListMedia(ctx context.Context, limit int) ([]domain.Media, error) {
+	return s.listMedia(ctx, limit, "")
+}
+
+// ListMediaForUser returns all media for admins and only owned media for
+// non-admin roles. Media library rows are user-scoped even when physical assets
+// are deduplicated.
+func (s *AuthStore) ListMediaForUser(ctx context.Context, limit int, user domain.User) ([]domain.Media, error) {
+	if user.Role == domain.RoleAdmin {
+		return s.listMedia(ctx, limit, "")
+	}
+	return s.listMedia(ctx, limit, user.ID)
+}
+
+func (s *AuthStore) listMedia(ctx context.Context, limit int, ownerID string) ([]domain.Media, error) {
 	if limit <= 0 || limit > 1000 {
 		limit = 200
 	}
+	where := ""
+	args := make([]any, 0, 2)
+	if ownerID != "" {
+		where = "WHERE media.created_by = ?"
+		args = append(args, ownerID)
+	}
+	args = append(args, limit)
 	var media []domain.Media
 	err := s.retry.QueryRetry(ctx, func() error {
 		rows, err := s.db.QueryContext(ctx, `
@@ -143,9 +164,10 @@ func (s *AuthStore) ListMedia(ctx context.Context, limit int) ([]domain.Media, e
 				media.created_at
 			FROM media
 			LEFT JOIN media_assets ON media_assets.id = media.asset_id
+			`+where+`
 			ORDER BY media.created_at DESC, media.id DESC
 			LIMIT ?
-		`, limit)
+		`, args...)
 		if err != nil {
 			return err
 		}
@@ -177,6 +199,25 @@ func (s *AuthStore) ListMedia(ctx context.Context, limit int) ([]domain.Media, e
 // GetMediaByID explains one unit of behavior in this package.
 // In Go, functions often return early on errors to keep the success path simple.
 func (s *AuthStore) GetMediaByID(ctx context.Context, id string) (domain.Media, error) {
+	return s.getMediaByID(ctx, id, "")
+}
+
+// GetMediaByIDForUser returns media by ID with the same owner boundary as
+// ListMediaForUser.
+func (s *AuthStore) GetMediaByIDForUser(ctx context.Context, id string, user domain.User) (domain.Media, error) {
+	if user.Role == domain.RoleAdmin {
+		return s.getMediaByID(ctx, id, "")
+	}
+	return s.getMediaByID(ctx, id, user.ID)
+}
+
+func (s *AuthStore) getMediaByID(ctx context.Context, id, ownerID string) (domain.Media, error) {
+	where := "WHERE media.id = ?"
+	args := []any{id}
+	if ownerID != "" {
+		where += " AND media.created_by = ?"
+		args = append(args, ownerID)
+	}
 	var media domain.Media
 	err := s.retry.QueryRetry(ctx, func() error {
 		row := s.db.QueryRowContext(ctx, `
@@ -194,9 +235,9 @@ func (s *AuthStore) GetMediaByID(ctx context.Context, id string) (domain.Media, 
 				media.created_at
 			FROM media
 			LEFT JOIN media_assets ON media_assets.id = media.asset_id
-			WHERE media.id = ?
+			`+where+`
 			LIMIT 1
-		`, id)
+		`, args...)
 		item, err := scanMedia(row)
 		if err != nil {
 			return err
