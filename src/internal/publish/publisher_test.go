@@ -9,13 +9,13 @@ package publish
 
 import (
 	"context"
-	"html/template"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"kcnotes/internal/content"
 	"kcnotes/internal/domain"
 	"kcnotes/internal/http/views"
 )
@@ -42,14 +42,6 @@ func (s fakeStore) ListPublicPages(_ context.Context, _ bool) ([]domain.Post, er
 // In Go, functions often return early on errors to keep the success path simple.
 func (s fakeStore) ListPublishableMedia(_ context.Context) ([]domain.Media, error) {
 	return s.media, nil
-}
-
-type fakeMarkdown struct{}
-
-// Render explains one unit of behavior in this package.
-// In Go, functions often return early on errors to keep the success path simple.
-func (fakeMarkdown) Render(markdown string) (template.HTML, error) {
-	return template.HTML("<p>" + template.HTMLEscapeString(markdown) + "</p>"), nil
 }
 
 // TestPublisherBuildsStaticSiteAndReplacesOldOutput explains one unit of behavior in this package.
@@ -157,7 +149,7 @@ func TestPublisherBuildsStaticSiteAndReplacesOldOutput(t *testing.T) {
 		StaticDir:   staticDir,
 		UploadDir:   uploadDir,
 		SiteBaseURL: "https://example.com",
-	}, renderer, store, fakeMarkdown{})
+	}, renderer, store, content.NewMarkdownRenderer())
 
 	result, err := pub.Publish(context.Background())
 	if err != nil {
@@ -197,5 +189,101 @@ func TestPublisherBuildsStaticSiteAndReplacesOldOutput(t *testing.T) {
 	}
 	if !strings.Contains(string(sitemap), "https://example.com/p/hello/") {
 		t.Fatalf("sitemap missing post URL: %s", sitemap)
+	}
+}
+
+// TestPublisherCopiesMediaReferencedByRenderedMarkdown explains one unit of behavior in this package.
+// In Go, functions often return early on errors to keep the success path simple.
+func TestPublisherCopiesMediaReferencedByRenderedMarkdown(t *testing.T) {
+	root := t.TempDir()
+	templatePath := filepath.Join(root, "templates", "all.tmpl")
+	if err := os.MkdirAll(filepath.Dir(templatePath), 0o755); err != nil {
+		t.Fatalf("mkdir templates: %v", err)
+	}
+
+	const tpl = `
+{{ define "shell-start" }}<!doctype html><html><head><title>{{ .Title }}</title></head><body>{{ end }}
+{{ define "shell-end" }}</body></html>{{ end }}
+{{ define "home" }}{{ template "shell-start" . }}{{ template "shell-end" . }}{{ end }}
+{{ define "public-post" }}{{ template "shell-start" . }}{{ .BodyHTML }}{{ template "shell-end" . }}{{ end }}
+{{ define "public-page" }}{{ template "shell-start" . }}{{ .BodyHTML }}{{ template "shell-end" . }}{{ end }}
+`
+	if err := os.WriteFile(templatePath, []byte(strings.TrimSpace(tpl)), 0o644); err != nil {
+		t.Fatalf("write templates: %v", err)
+	}
+
+	renderer, err := views.NewRenderer(filepath.Join(root, "templates", "*.tmpl"))
+	if err != nil {
+		t.Fatalf("new renderer: %v", err)
+	}
+
+	staticDir := filepath.Join(root, "static")
+	if err := os.MkdirAll(staticDir, 0o755); err != nil {
+		t.Fatalf("mkdir static: %v", err)
+	}
+
+	uploadDir := filepath.Join(root, "uploads")
+	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+		t.Fatalf("mkdir uploads: %v", err)
+	}
+	for _, name := range []string{"angle.png", "ref.png", "unused.png"} {
+		if err := os.WriteFile(filepath.Join(uploadDir, name), []byte{0x89, 0x50, 0x4e, 0x47}, 0o644); err != nil {
+			t.Fatalf("write upload %s: %v", name, err)
+		}
+	}
+
+	now := time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC)
+	store := fakeStore{
+		posts: []domain.Post{{
+			ID:          "p-angle",
+			Type:        domain.PostTypePost,
+			Title:       "Angle",
+			Slug:        "angle",
+			BodyMD:      "![Angle](</media/angle.png>)",
+			Status:      domain.PostStatusPublished,
+			UpdatedAt:   now,
+			PublishedAt: &now,
+		}},
+		pages: []domain.Post{{
+			ID:        "pg-ref",
+			Type:      domain.PostTypePage,
+			Title:     "Ref",
+			Slug:      "ref",
+			BodyMD:    "![Referenced][img]\n\n[img]:/media/ref.png",
+			Status:    domain.PostStatusPublished,
+			UpdatedAt: now,
+		}},
+		media: []domain.Media{{
+			ID:         "m-angle",
+			StoredName: "angle.png",
+			MIME:       "image/png",
+		}, {
+			ID:         "m-ref",
+			StoredName: "ref.png",
+			MIME:       "image/png",
+		}, {
+			ID:         "m-unused",
+			StoredName: "unused.png",
+			MIME:       "image/png",
+		}},
+	}
+
+	pub := New(Config{
+		OutDir:    filepath.Join(root, "dist"),
+		StaticDir: staticDir,
+		UploadDir: uploadDir,
+	}, renderer, store, content.NewMarkdownRenderer())
+
+	if _, err := pub.Publish(context.Background()); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	for _, name := range []string{"angle.png", "ref.png"} {
+		if _, err := os.Stat(filepath.Join(pub.cfg.OutDir, "media", name)); err != nil {
+			t.Fatalf("expected referenced media %s to be published: %v", name, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(pub.cfg.OutDir, "media", "unused.png")); !os.IsNotExist(err) {
+		t.Fatalf("expected unreferenced media not to be published, err=%v", err)
 	}
 }

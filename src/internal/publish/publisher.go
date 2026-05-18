@@ -16,18 +16,16 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
 
+	xhtml "golang.org/x/net/html"
 	"kcnotes/internal/domain"
 	"kcnotes/internal/http/views"
 )
 
 const manifestName = ".publish-manifest.json"
-
-var mediaReferencePattern = regexp.MustCompile(`(?:^|[\s('"])/media/([A-Za-z0-9._-]+)`)
 
 type Store interface {
 	ListPublicPosts(ctx context.Context, includeDrafts bool, limit int) ([]domain.Post, error)
@@ -158,6 +156,7 @@ func (p *Publisher) Publish(ctx context.Context) (Result, error) {
 // In Go, functions often return early on errors to keep the success path simple.
 func (p *Publisher) renderAll(ctx context.Context, outDir string) ([]string, error) {
 	renderedFiles := make([]string, 0, 32)
+	referencedMedia := map[string]struct{}{}
 
 	posts, err := p.store.ListPublicPosts(ctx, p.cfg.IncludeDrafts, 0)
 	if err != nil {
@@ -174,11 +173,6 @@ func (p *Publisher) renderAll(ctx context.Context, outDir string) ([]string, err
 	if assets, err := listFiles(filepath.Join(outDir, "assets")); err == nil {
 		renderedFiles = append(renderedFiles, assets...)
 	}
-	mediaFiles, err := p.copyUploadedMedia(ctx, outDir, referencedMediaNames(posts, pages))
-	if err != nil {
-		return nil, err
-	}
-	renderedFiles = append(renderedFiles, mediaFiles...)
 
 	if err := p.renderTemplateToPath(filepath.Join(outDir, "index.html"), "home", map[string]any{
 		"Title":         "Home",
@@ -197,6 +191,7 @@ func (p *Publisher) renderAll(ctx context.Context, outDir string) ([]string, err
 		if err != nil {
 			return nil, fmt.Errorf("render markdown for post %s: %w", post.ID, err)
 		}
+		collectRenderedMediaNames(referencedMedia, bodyHTML)
 		route := fmt.Sprintf("/p/%s/", post.Slug)
 		target := filepath.Join(outDir, "p", post.Slug, "index.html")
 		if err := p.renderTemplateToPath(target, "public-post", map[string]any{
@@ -221,6 +216,7 @@ func (p *Publisher) renderAll(ctx context.Context, outDir string) ([]string, err
 		if err != nil {
 			return nil, fmt.Errorf("render markdown for page %s: %w", page.ID, err)
 		}
+		collectRenderedMediaNames(referencedMedia, bodyHTML)
 		route := fmt.Sprintf("/page/%s/", page.Slug)
 		target := filepath.Join(outDir, "page", page.Slug, "index.html")
 		if err := p.renderTemplateToPath(target, "public-page", map[string]any{
@@ -239,6 +235,12 @@ func (p *Publisher) renderAll(ctx context.Context, outDir string) ([]string, err
 		renderedFiles = append(renderedFiles, toSlashPath(rel))
 		urls = append(urls, route)
 	}
+
+	mediaFiles, err := p.copyUploadedMedia(ctx, outDir, referencedMedia)
+	if err != nil {
+		return nil, err
+	}
+	renderedFiles = append(renderedFiles, mediaFiles...)
 
 	if err := p.writeRSS(outDir, posts); err != nil {
 		return nil, err
@@ -322,18 +324,53 @@ func (p *Publisher) copyUploadedMediaFile(mediaDir, storedName string, seen map[
 	return filepath.ToSlash(filepath.Join("media", storedName)), nil
 }
 
-func referencedMediaNames(groups ...[]domain.Post) map[string]struct{} {
-	refs := map[string]struct{}{}
-	for _, posts := range groups {
-		for _, post := range posts {
-			for _, match := range mediaReferencePattern.FindAllStringSubmatch(post.BodyMD, -1) {
-				if len(match) == 2 && filepath.Base(match[1]) == match[1] {
-					refs[match[1]] = struct{}{}
-				}
+func collectRenderedMediaNames(refs map[string]struct{}, markup template.HTML) {
+	tokenizer := xhtml.NewTokenizer(strings.NewReader(string(markup)))
+	for {
+		switch tokenizer.Next() {
+		case xhtml.ErrorToken:
+			return
+		case xhtml.StartTagToken, xhtml.SelfClosingTagToken:
+			token := tokenizer.Token()
+			for _, attr := range token.Attr {
+				collectMediaNamesFromAttributeValue(refs, attr.Key, attr.Val)
 			}
 		}
 	}
-	return refs
+}
+
+func collectMediaNamesFromAttributeValue(refs map[string]struct{}, key, value string) {
+	switch key {
+	case "src", "href", "poster":
+		if name, ok := mediaStoredNameFromURL(value); ok {
+			refs[name] = struct{}{}
+		}
+	case "srcset":
+		for _, candidate := range strings.Split(value, ",") {
+			parts := strings.Fields(candidate)
+			if len(parts) == 0 {
+				continue
+			}
+			if name, ok := mediaStoredNameFromURL(parts[0]); ok {
+				refs[name] = struct{}{}
+			}
+		}
+	}
+}
+
+func mediaStoredNameFromURL(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", false
+	}
+	if cut := strings.IndexAny(raw, "?#"); cut >= 0 {
+		raw = raw[:cut]
+	}
+	name, ok := strings.CutPrefix(raw, "/media/")
+	if !ok || name == "" || filepath.Base(name) != name {
+		return "", false
+	}
+	return name, true
 }
 
 func hasMediaReference(referenced map[string]struct{}, item domain.Media) bool {
